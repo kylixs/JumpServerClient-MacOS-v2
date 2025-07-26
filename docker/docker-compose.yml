@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  jms-protocol-handler-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: jms-protocol-handler-dev
+    volumes:
+      - ../:/workspace
+      - build-cache:/workspace/build
+      - swift-cache:/root/.cache/swift
+    environment:
+      - SWIFT_VERSION=5.9
+      - PROJECT_NAME=JMSProtocolHandler
+      - BUILD_CONFIGURATION=Release
+    working_dir: /workspace
+    command: tail -f /dev/null
+    networks:
+      - jms-network
+
+  # 测试环境
+  jms-protocol-handler-test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: jms-protocol-handler-test
+    volumes:
+      - ../:/workspace
+      - test-results:/workspace/test-results
+    environment:
+      - SWIFT_VERSION=5.9
+      - PROJECT_NAME=JMSProtocolHandler
+      - BUILD_CONFIGURATION=Debug
+      - TEST_MODE=true
+    working_dir: /workspace
+    command: swift test
+    depends_on:
+      - jms-protocol-handler-dev
+    networks:
+      - jms-network
+
+volumes:
+  build-cache:
+    driver: local
+  swift-cache:
+    driver: local
+  test-results:
+    driver: local
+
+networks:
+  jms-network:
+    driver: bridge
