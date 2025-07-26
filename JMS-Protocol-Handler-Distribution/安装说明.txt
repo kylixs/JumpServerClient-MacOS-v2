@@ -1,0 +1,28 @@
+# JMS Protocol Handler 安装指南
+
+## 系统要求
+- macOS 10.15 (Catalina) 或更高版本
+- Microsoft Remote Desktop 应用程序
+
+## 安装步骤
+
+### 方法1: DMG安装 (推荐)
+1. 双击下载的 JMS-Protocol-Handler-1.0.0.dmg 文件
+2. 将 JMSProtocolHandler.app 拖拽到 Applications 文件夹
+3. 首次运行时，右键点击应用程序选择"打开"
+4. 在安全提示中点击"打开"
+
+### 方法2: PKG安装
+1. 双击 JMS-Protocol-Handler-1.0.0.pkg 文件
+2. 按照安装向导完成安装
+3. 应用程序将自动安装到 Applications 文件夹
+
+## 首次使用
+1. 确保已安装 Microsoft Remote Desktop
+2. 点击 JMS 协议链接测试功能
+3. 如有问题，请查看故障排除指南
+
+## 注意事项
+- 应用程序需要网络访问权限
+- 首次运行可能需要授权
+- 建议将应用程序添加到登录项
