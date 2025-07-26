@@ -1,17 +1,35 @@
 import Foundation
 
-/// 连接信息提取器实现类，负责从JMS配置中提取远程桌面连接信息
+/// 连接信息提取器实现类，负责从JMS配置中提取RDP和SSH连接信息
 class ConnectionInfoExtractor: ConnectionInfoExtractorProtocol {
     
     /// 从JMS配置中提取连接信息
     /// - Parameter config: JMS配置对象
-    /// - Returns: 提取的连接信息
-    /// - Throws: JMSError.missingConnectionInfo 如果缺少必要的连接信息
+    /// - Returns: 提取的连接信息（RDP或SSH）
+    /// - Throws: JMSError 如果缺少必要的连接信息或协议不支持
     func extractConnectionInfo(from config: JMSConfig) throws -> ConnectionInfo {
         // 首先验证配置的有效性
         try config.validate()
         
-        // 解析配置字符串
+        // 根据协议类型提取相应的连接信息
+        switch config.protocol.lowercased() {
+        case "rdp":
+            return try extractRDPConnectionInfo(from: config)
+        case "ssh":
+            return try extractSSHConnectionInfo(from: config)
+        default:
+            throw JMSError.unsupportedProtocol
+        }
+    }
+    
+    // MARK: - RDP Connection Info Extraction
+    
+    /// 从JMS配置中提取RDP连接信息
+    /// - Parameter config: JMS配置对象
+    /// - Returns: RDP连接信息
+    /// - Throws: JMSError 如果缺少必要的连接信息
+    private func extractRDPConnectionInfo(from config: JMSConfig) throws -> ConnectionInfo {
+        // 解析RDP配置字符串
         let configParams = try parseConfigString(config.config)
         
         // 提取必要的连接信息
@@ -41,8 +59,8 @@ class ConnectionInfoExtractor: ConnectionInfoExtractorProtocol {
             }
         }
         
-        // 创建连接信息对象
-        let connectionInfo = ConnectionInfo(
+        // 创建RDP连接信息对象
+        let rdpConnectionInfo = RDPConnectionInfo(
             fullAddress: fullAddress,
             username: username,
             sessionBpp: sessionBpp,
@@ -53,10 +71,61 @@ class ConnectionInfoExtractor: ConnectionInfoExtractorProtocol {
         )
         
         // 验证连接信息的完整性
-        try connectionInfo.validate()
+        try rdpConnectionInfo.validate()
         
-        return connectionInfo
+        return .rdp(rdpConnectionInfo)
     }
+    
+    // MARK: - SSH Connection Info Extraction
+    
+    /// 从JMS配置中提取SSH连接信息
+    /// - Parameter config: JMS配置对象
+    /// - Returns: SSH连接信息
+    /// - Throws: JMSError 如果缺少必要的连接信息或token解析失败
+    private func extractSSHConnectionInfo(from config: JMSConfig) throws -> ConnectionInfo {
+        // SSH协议的连接信息在token字段中
+        guard !config.token.isEmpty else {
+            throw JMSError.missingConnectionInfo
+        }
+        
+        // 解析token中的JSON数据
+        let sshToken = try parseSSHToken(config.token)
+        
+        // 创建SSH连接信息对象
+        let sshConnectionInfo = SSHConnectionInfo(
+            ip: sshToken.ip,
+            port: sshToken.port,
+            username: sshToken.username,
+            password: sshToken.password,
+            filename: config.filename
+        )
+        
+        // 验证连接信息的完整性
+        try sshConnectionInfo.validate()
+        
+        return .ssh(sshConnectionInfo)
+    }
+    
+    /// 解析SSH Token中的JSON数据
+    /// - Parameter tokenString: token字符串
+    /// - Returns: 解析后的SSH Token对象
+    /// - Throws: JMSError.sshTokenParsingFailed 如果解析失败
+    private func parseSSHToken(_ tokenString: String) throws -> SSHToken {
+        guard let tokenData = tokenString.data(using: .utf8) else {
+            throw JMSError.sshTokenParsingFailed
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            let sshToken = try decoder.decode(SSHToken.self, from: tokenData)
+            return sshToken
+        } catch {
+            print("SSH Token解析错误: \(error)")
+            throw JMSError.sshTokenParsingFailed
+        }
+    }
+    
+    // MARK: - RDP Config Parsing Methods
     
     /// 解析配置字符串中的参数
     /// - Parameter configString: 配置字符串
@@ -157,5 +226,26 @@ class ConnectionInfoExtractor: ConnectionInfoExtractorProtocol {
     private func isValidConfigType(_ type: String) -> Bool {
         let validTypes = ["s", "i", "b"] // s=string, i=integer, b=binary/boolean
         return validTypes.contains(type)
+    }
+}
+
+// MARK: - SSH Token Model
+
+/// SSH Token数据模型（用于解析token字段中的JSON）
+struct SSHToken: Codable {
+    /// 服务器IP地址
+    let ip: String
+    
+    /// SSH端口号
+    let port: String
+    
+    /// 用户名
+    let username: String
+    
+    /// 密码
+    let password: String
+    
+    enum CodingKeys: String, CodingKey {
+        case ip, port, username, password
     }
 }

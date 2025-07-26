@@ -3,11 +3,20 @@ import Cocoa
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
     
+    // MARK: - Service Dependencies
+    private let urlParser = URLParser()
+    private let payloadDecoder = PayloadDecoder()
+    private let connectionInfoExtractor = ConnectionInfoExtractor()
+    private let remoteDesktopIntegrator = RemoteDesktopIntegrator()
+    private let sshTerminalIntegrator = SSHTerminalIntegrator()
+    private let errorHandler = ErrorHandler()
+    private let notificationManager = NotificationManager()
+    
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        print("JMS Protocol Handler started")
+        print("JMS Protocol Handler started - 支持RDP和SSH协议")
         
         // 显示启动成功通知
-        showNotification("JMS Protocol Handler 已启动，准备处理连接请求")
+        notificationManager.showNotification("JMS Protocol Handler 已启动，准备处理RDP和SSH连接请求")
     }
     
     func applicationWillTerminate(_ aNotification: Notification) {
@@ -33,129 +42,129 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         do {
             // 步骤1: URL解析和验证
-            print("Step 1: Parsing JMS URL...")
-            guard url.scheme?.lowercased() == "jms" else {
-                throw NSError(domain: "JMSError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL scheme"])
-            }
-            
-            guard let host = url.host, !host.isEmpty else {
-                throw NSError(domain: "JMSError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Empty payload"])
-            }
-            
-            print("✅ URL parsed successfully. Payload length: \(host.count)")
+            print("Step 1: 解析JMS URL...")
+            let urlComponents = try urlParser.parseJMSURL(url)
+            print("✅ URL解析成功. Payload长度: \(urlComponents.encodedPayload.count)")
             
             // 步骤2: Base64解码和JSON解析
-            print("Step 2: Decoding payload...")
-            guard let decodedData = Data(base64Encoded: host) else {
-                throw NSError(domain: "JMSError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Base64 decoding failed"])
-            }
-            
-            guard let jsonString = String(data: decodedData, encoding: .utf8) else {
-                throw NSError(domain: "JMSError", code: 4, userInfo: [NSLocalizedDescriptionKey: "Invalid UTF-8 data"])
-            }
-            
-            print("✅ Payload decoded successfully")
+            print("Step 2: 解码payload...")
+            let decodedData = try payloadDecoder.decodeBase64Payload(urlComponents.encodedPayload)
+            let jmsConfig = try payloadDecoder.parseJSONConfig(decodedData)
+            print("✅ Payload解码成功. 协议类型: \(jmsConfig.protocol)")
             
             // 步骤3: 提取连接信息
-            print("Step 3: Extracting connection info...")
-            let connectionInfo = try extractConnectionInfo(from: jsonString)
-            print("✅ Connection info extracted. Server: \(connectionInfo.server), User: \(connectionInfo.username)")
+            print("Step 3: 提取连接信息...")
+            let connectionInfo = try connectionInfoExtractor.extractConnectionInfo(from: jmsConfig)
+            print("✅ 连接信息提取成功: \(connectionInfo.description)")
             
-            // 步骤4: 启动Microsoft Remote Desktop
-            print("Step 4: Launching Microsoft Remote Desktop...")
-            try launchRemoteDesktop(with: connectionInfo)
-            print("✅ Microsoft Remote Desktop launched successfully")
+            // 步骤4: 根据协议类型启动相应的连接
+            print("Step 4: 启动连接...")
+            try launchConnection(with: connectionInfo)
+            print("✅ 连接启动成功")
             
             // 显示成功通知
-            showNotification("成功连接到 \(connectionInfo.server)")
+            notificationManager.showNotification("成功启动连接: \(connectionInfo.description)")
             
+        } catch let error as JMSError {
+            print("❌ JMS错误: \(error.localizedDescription)")
+            errorHandler.handleError(error)
         } catch {
-            print("❌ Error: \(error.localizedDescription)")
-            showNotification("连接失败: \(error.localizedDescription)")
+            print("❌ 未知错误: \(error.localizedDescription)")
+            let jmsError = JMSError.jsonParsingFailed
+            errorHandler.handleError(jmsError)
         }
     }
     
-    // MARK: - Helper Methods
-    
-    private func extractConnectionInfo(from jsonString: String) throws -> (server: String, username: String) {
-        // 解析JSON配置
-        guard let jsonData = jsonString.data(using: .utf8),
-              let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-              let config = json["config"] as? String else {
-            throw NSError(domain: "JMSError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON format"])
+    /// 根据连接信息类型启动相应的连接
+    /// - Parameter connectionInfo: 连接信息（RDP或SSH）
+    /// - Throws: JMSError 如果启动失败
+    private func launchConnection(with connectionInfo: ConnectionInfo) throws {
+        switch connectionInfo {
+        case .rdp(let rdpInfo):
+            try launchRDPConnection(with: rdpInfo)
+        case .ssh(let sshInfo):
+            try launchSSHConnection(with: sshInfo)
         }
-        
-        // 解析配置字符串
-        let lines = config.components(separatedBy: "\n")
-        var server = ""
-        var username = ""
-        
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("full address:s:") {
-                server = String(trimmed.dropFirst("full address:s:".count))
-            } else if trimmed.hasPrefix("username:s:") {
-                username = String(trimmed.dropFirst("username:s:".count))
-            }
-        }
-        
-        guard !server.isEmpty, !username.isEmpty else {
-            throw NSError(domain: "JMSError", code: 6, userInfo: [NSLocalizedDescriptionKey: "Missing connection info"])
-        }
-        
-        return (server: server, username: username)
     }
     
-    private func launchRemoteDesktop(with connectionInfo: (server: String, username: String)) throws {
+    /// 启动RDP远程桌面连接
+    /// - Parameter rdpInfo: RDP连接信息
+    /// - Throws: JMSError 如果启动失败
+    private func launchRDPConnection(with rdpInfo: RDPConnectionInfo) throws {
+        print("启动RDP连接到: \(rdpInfo.fullAddress)")
+        
         // 检查Microsoft Remote Desktop是否可用
-        guard NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") != nil else {
-            throw NSError(domain: "JMSError", code: 7, userInfo: [NSLocalizedDescriptionKey: "Microsoft Remote Desktop not found"])
+        guard remoteDesktopIntegrator.checkRemoteDesktopAvailability() else {
+            throw JMSError.remoteDesktopNotFound
         }
         
-        // 创建临时RDP文件
-        let rdpContent = """
-        full address:s:\(connectionInfo.server)
-        username:s:\(connectionInfo.username)
-        session bpp:i:32
-        audiomode:i:0
-        smart sizing:i:1
-        screen mode id:i:2
-        """
+        // 启动Remote Desktop
+        try remoteDesktopIntegrator.launchRemoteDesktop(with: rdpInfo)
         
-        let tempDir = FileManager.default.temporaryDirectory
-        let rdpFile = tempDir.appendingPathComponent("jms_connection_\(UUID().uuidString).rdp")
-        
-        try rdpContent.write(to: rdpFile, atomically: true, encoding: .utf8)
-        
-        // 设置文件权限
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: rdpFile.path)
-        
-        // 启动Microsoft Remote Desktop
-        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") {
-            try NSWorkspace.shared.open([rdpFile], withApplicationAt: appURL, configuration: NSWorkspace.OpenConfiguration())
-        } else {
-            let success = NSWorkspace.shared.open(rdpFile)
-            if !success {
-                throw NSError(domain: "JMSError", code: 8, userInfo: [NSLocalizedDescriptionKey: "Failed to launch Remote Desktop"])
-            }
-        }
-        
-        // 延迟清理临时文件
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-            try? FileManager.default.removeItem(at: rdpFile)
-        }
+        print("RDP连接启动成功")
     }
     
-    private func showNotification(_ message: String) {
-        // 简单的通知实现
-        print("📢 Notification: \(message)")
+    /// 启动SSH终端连接
+    /// - Parameter sshInfo: SSH连接信息
+    /// - Throws: JMSError 如果启动失败
+    private func launchSSHConnection(with sshInfo: SSHConnectionInfo) throws {
+        print("启动SSH连接到: \(sshInfo.connectionString)")
         
-        // 尝试显示系统通知
-        let notification = NSUserNotification()
-        notification.title = "JMS Protocol Handler"
-        notification.informativeText = message
-        notification.soundName = NSUserNotificationDefaultSoundName
+        // 检测可用的终端应用程序
+        let terminalApp = sshTerminalIntegrator.detectAvailableTerminal()
+        print("检测到终端应用程序: \(terminalApp.displayName)")
         
-        NSUserNotificationCenter.default.deliver(notification)
+        // 检查expect工具可用性
+        let expectAvailable = sshTerminalIntegrator.checkExpectAvailability()
+        print("Expect工具可用性: \(expectAvailable ? "可用" : "不可用")")
+        
+        if !expectAvailable {
+            notificationManager.showNotification("注意：expect工具不可用，需要手动输入SSH密码")
+        }
+        
+        // 启动SSH会话
+        try sshTerminalIntegrator.launchSSHSession(with: sshInfo)
+        
+        print("SSH连接启动成功")
+    }
+}
+
+// MARK: - Extensions
+
+extension AppDelegate {
+    /// 获取应用程序状态信息
+    /// - Returns: 状态信息字典
+    func getApplicationStatus() -> [String: Any] {
+        return [
+            "name": "JMS Protocol Handler",
+            "version": "1.0.0",
+            "supportedProtocols": ["rdp", "ssh"],
+            "rdpIntegration": [
+                "available": remoteDesktopIntegrator.checkRemoteDesktopAvailability()
+            ],
+            "sshIntegration": [
+                "availableTerminals": sshTerminalIntegrator.getAllTerminalAppsStatus(),
+                "expectAvailable": sshTerminalIntegrator.checkExpectAvailability()
+            ]
+        ]
+    }
+    
+    /// 测试连接功能
+    /// - Parameters:
+    ///   - protocol: 协议类型 ("rdp" 或 "ssh")
+    ///   - testData: 测试数据
+    func testConnection(protocol: String, testData: [String: Any]) {
+        print("测试\(protocol.uppercased())连接功能...")
+        
+        // 这里可以添加测试逻辑
+        switch protocol.lowercased() {
+        case "rdp":
+            print("RDP集成状态: \(remoteDesktopIntegrator.checkRemoteDesktopAvailability())")
+        case "ssh":
+            print("SSH终端状态: \(sshTerminalIntegrator.detectAvailableTerminal().displayName)")
+            print("Expect工具状态: \(sshTerminalIntegrator.checkExpectAvailability())")
+        default:
+            print("不支持的协议类型: \(protocol)")
+        }
     }
 }
