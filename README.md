@@ -1,11 +1,13 @@
 # JMS Protocol Handler
 
-一个用于处理 `jms://` 协议链接的 macOS 应用程序，自动解析连接信息并启动 Microsoft Remote Desktop 建立远程桌面连接。
+一个用于处理 `jms://` 协议链接的 macOS 应用程序，支持多种连接类型：
+- **RDP协议**: 自动解析连接信息并启动 Microsoft Remote Desktop 建立远程桌面连接
+- **SSH协议**: 通过本地终端（Terminal或iTerm2）建立SSH会话连接，支持自动密码输入
 
 ## 🚀 快速开始
 
 ### 安装
-1. 下载 `JMS-Protocol-Handler-v1.0.0.dmg`
+1. 下载 `JMS-Protocol-Handler-v1.1.0.dmg`
 2. 双击挂载 DMG 文件
 3. 将 `JMSProtocolHandler.app` 拖拽到 `Applications` 文件夹
 
@@ -20,15 +22,26 @@
 
 ### 使用
 点击任何 `jms://` 协议链接，应用程序将自动：
-1. 解析连接信息
-2. 创建 RDP 配置文件
-3. 启动 Microsoft Remote Desktop
+
+#### RDP连接
+1. 解析RDP连接信息
+2. 创建RDP配置文件
+3. 启动Microsoft Remote Desktop
 4. 建立远程桌面连接
+
+#### SSH连接
+1. 解析SSH连接信息
+2. 检测可用终端应用程序
+3. 构建SSH连接命令
+4. 启动终端并建立SSH会话
+5. 自动输入密码（如果expect可用）
 
 ## 📋 系统要求
 
 - **操作系统**: macOS 10.15 (Catalina) 或更高版本
-- **依赖应用**: Microsoft Remote Desktop (从 Mac App Store 安装)
+- **RDP依赖**: Microsoft Remote Desktop (从 Mac App Store 安装)
+- **SSH依赖**: Terminal (系统自带) 或 iTerm2 (推荐)
+- **可选工具**: expect (自动密码输入): `brew install expect`
 - **架构支持**: Apple Silicon (ARM64) + Intel (x86_64)
 - **磁盘空间**: 50MB 可用空间
 
@@ -56,9 +69,11 @@ jumpserver-client/
 
 ## ✨ 功能特性
 
-- ✅ **自动协议处理**: 完整的 jms:// 协议支持
-- ✅ **智能解析**: Base64 解码和 JSON 配置解析
-- ✅ **无缝集成**: 与 Microsoft Remote Desktop 的完美集成
+- ✅ **双协议支持**: 完整的 RDP 和 SSH 协议支持
+- ✅ **智能协议识别**: 自动识别连接类型并分发到相应处理器
+- ✅ **无缝RDP集成**: 与 Microsoft Remote Desktop 的完美集成
+- ✅ **智能终端集成**: 优先使用 iTerm2，备用 Terminal
+- ✅ **自动密码输入**: 通过 expect 脚本实现 SSH 自动认证
 - ✅ **错误处理**: 智能错误处理和用户友好提示
 - ✅ **高性能**: 极快的启动和处理速度
 - ✅ **Apple Silicon**: 原生 ARM64 支持
@@ -214,19 +229,20 @@ build/
 
 ## 📞 联系信息
 
-- **项目版本**: 1.0.0
-- **构建日期**: 2025-07-25
+- **项目版本**: 1.1.0
+- **构建日期**: 2025-07-26
 - **兼容性**: macOS 10.15+
 - **架构**: Universal (ARM64 + x86_64)
+- **支持协议**: RDP + SSH
 
 ---
 
 ## 🎯 快速链接
 
-- [📥 下载安装包](JMS-Protocol-Handler-v1.0.0.dmg)
+- [📥 下载安装包](JMS-Protocol-Handler-v1.1.0.dmg)
 - [📖 用户指南](docs/user-guide/)
 - [🔧 开发文档](docs/implementation/)
 - [🧪 测试报告](tests/)
 - [🚀 部署脚本](scripts/deployment/)
 
-**让远程桌面连接变得简单！** 🚀
+**让远程桌面和SSH连接变得简单！** 🚀
