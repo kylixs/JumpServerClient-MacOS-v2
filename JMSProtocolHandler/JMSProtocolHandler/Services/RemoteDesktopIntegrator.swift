@@ -52,7 +52,7 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
         return false
     }
     
-    func createTemporaryRDPFile(with connectionInfo: ConnectionInfo) throws -> URL {
+    func createTemporaryRDPFile(with connectionInfo: RDPConnectionInfo) throws -> URL {
         // 验证连接信息
         try connectionInfo.validate()
         
@@ -77,7 +77,7 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
         }
     }
     
-    func launchRemoteDesktop(with connectionInfo: ConnectionInfo) throws {
+    func launchRemoteDesktop(with connectionInfo: RDPConnectionInfo) throws {
         // 检查Microsoft Remote Desktop是否可用
         guard checkRemoteDesktopAvailability() else {
             throw JMSError.remoteDesktopNotFound
