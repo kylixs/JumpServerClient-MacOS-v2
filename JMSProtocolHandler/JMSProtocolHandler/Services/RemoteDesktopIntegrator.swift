@@ -26,6 +26,9 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
     /// RDP配置优化器
     private let configOptimizer: RDPConfigOptimizer
     
+    /// 质量配置管理器
+    private let qualityConfigManager: RDPQualityConfigManager
+    
     // MARK: - Initialization
     
     init() {
@@ -36,6 +39,9 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
         // 初始化显示优化组件
         self.displayDetector = DisplayDetector()
         self.configOptimizer = RDPConfigOptimizer()
+        
+        // 初始化质量配置管理器
+        self.qualityConfigManager = RDPQualityConfigManager.shared
         
         // 确保临时目录存在
         try? FileManager.default.createDirectory(at: temporaryDirectory, 
@@ -63,9 +69,21 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
     }
     
     func launchRemoteDesktop(with connectionInfo: RDPConnectionInfo) throws {
-        // 使用显示优化的方式启动
-        let displaySettings = try detectAndOptimizeDisplay()
-        try launchOptimizedRemoteDesktop(with: connectionInfo, displaySettings: displaySettings)
+        // 获取当前质量配置
+        let currentProfile = qualityConfigManager.getCurrentQualityProfile()
+        let qualitySettings = qualityConfigManager.getQualityProfileSettings(currentProfile)
+        
+        // 检测显示器配置
+        let displayConfig = try displayDetector.detectPrimaryDisplay()
+        
+        // 合并质量配置和显示器优化
+        let optimizedSettings = try mergeQualityAndDisplaySettings(
+            qualitySettings: qualitySettings,
+            displayConfig: displayConfig
+        )
+        
+        // 使用优化后的设置启动RDP连接
+        try launchOptimizedRemoteDesktop(with: connectionInfo, displaySettings: optimizedSettings)
     }
     
     func launchOptimizedRemoteDesktop(with connectionInfo: RDPConnectionInfo, displaySettings: RDPDisplaySettings) throws {
@@ -204,5 +222,94 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
         }
         
         return true
+    }
+    
+    // MARK: - Quality Configuration Integration
+    
+    /// 合并质量配置和显示器设置
+    /// - Parameters:
+    ///   - qualitySettings: 用户选择的质量设置
+    ///   - displayConfig: 检测到的显示器配置
+    /// - Returns: 合并后的RDP显示设置
+    /// - Throws: 如果合并过程中出现错误
+    private func mergeQualityAndDisplaySettings(
+        qualitySettings: RDPQualitySettings,
+        displayConfig: DisplayConfiguration
+    ) throws -> RDPDisplaySettings {
+        
+        // 基于显示器配置计算最优分辨率
+        let optimalWidth = min(displayConfig.width, 3840) // 限制最大4K分辨率
+        let optimalHeight = min(displayConfig.height, 2160)
+        
+        // 根据显示器特性调整缩放因子
+        let scaleFactor = displayConfig.isRetina ? Int(displayConfig.scaleFactor * 100) : 100
+        
+        // 合并用户质量偏好和显示器优化
+        let mergedSettings = RDPDisplaySettings(
+            desktopWidth: optimalWidth,
+            desktopHeight: optimalHeight,
+            sessionBpp: qualitySettings.colorDepth,
+            desktopScaleFactor: scaleFactor,
+            smartSizing: true, // 始终启用智能调整
+            compression: qualitySettings.compressionLevel,
+            bitmapCachePersistEnable: qualitySettings.bitmapCaching,
+            disableWallpaper: !qualitySettings.enableWallpaper,
+            allowFontSmoothing: qualitySettings.enableFontSmoothing && displayConfig.isRetina,
+            screenModeId: 2 // 全屏模式
+        )
+        
+        return mergedSettings
+    }
+    
+    /// 快速切换质量配置
+    /// - Parameter profile: 要切换到的质量配置文件
+    func switchQualityProfile(_ profile: DisplayQualityProfile) {
+        qualityConfigManager.setQualityProfile(profile)
+        
+        // 发送通知告知配置已更改
+        NotificationCenter.default.post(
+            name: Notification.Name("RDPQualityProfileChanged"),
+            object: self,
+            userInfo: ["profile": profile]
+        )
+    }
+    
+    /// 获取当前质量配置的性能分析
+    /// - Returns: 当前配置的性能分析结果
+    func getCurrentQualityAnalysis() -> PerformanceAnalysis {
+        let currentProfile = qualityConfigManager.getCurrentQualityProfile()
+        let qualitySettings = qualityConfigManager.getQualityProfileSettings(currentProfile)
+        return qualityConfigManager.analyzePerformanceImpact(for: qualitySettings)
+    }
+    
+    /// 根据网络条件推荐质量配置
+    /// - Parameter networkType: 网络类型
+    /// - Returns: 推荐的质量配置文件
+    func recommendQualityProfile(for networkType: NetworkOptimization) -> DisplayQualityProfile {
+        return qualityConfigManager.getConfigurationRecommendation(for: networkType)
+    }
+    
+    /// 创建包含质量配置的RDP文件
+    /// - Parameters:
+    ///   - connectionInfo: RDP连接信息
+    ///   - qualitySettings: 质量设置
+    /// - Returns: 临时RDP文件的URL
+    /// - Throws: 如果创建文件失败
+    func createRDPFileWithQuality(
+        connectionInfo: RDPConnectionInfo,
+        qualitySettings: RDPQualitySettings
+    ) throws -> URL {
+        
+        // 检测显示器配置
+        let displayConfig = try displayDetector.detectPrimaryDisplay()
+        
+        // 合并质量配置和显示器优化
+        let optimizedSettings = try mergeQualityAndDisplaySettings(
+            qualitySettings: qualitySettings,
+            displayConfig: displayConfig
+        )
+        
+        // 创建优化的RDP文件
+        return try createOptimizedRDPFile(with: connectionInfo, displaySettings: optimizedSettings)
     }
 }
