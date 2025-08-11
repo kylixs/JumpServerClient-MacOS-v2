@@ -150,14 +150,86 @@ struct SSHToken: Codable {
 protocol RemoteDesktopIntegratorProtocol {
     func launchRemoteDesktop(with connectionInfo: RDPConnectionInfo) throws
     func checkRemoteDesktopAvailability() -> Bool
+    func generateOptimizedRDPConfig(for connectionInfo: RDPConnectionInfo) -> String
 }
 ```
 
 **职责:**
 - 检查Microsoft Remote Desktop是否已安装
-- 创建临时的RDP配置文件
+- 检测显示器配置并优化RDP参数
+- 创建优化的RDP配置文件
 - 启动Microsoft Remote Desktop并传递连接参数
 - 处理应用程序启动失败的情况
+
+### 5.1. 显示器检测器 (DisplayDetector)
+```swift
+protocol DisplayDetectorProtocol {
+    func detectPrimaryDisplay() -> DisplayConfiguration
+    func detectAllDisplays() -> [DisplayConfiguration]
+    func isHiDPIDisplay() -> Bool
+    func getOptimalRDPSettings() -> RDPDisplaySettings
+}
+
+struct DisplayConfiguration {
+    let width: Int
+    let height: Int
+    let scaleFactor: CGFloat
+    let colorDepth: Int
+    let refreshRate: Int
+    let isRetina: Bool
+    let isExternal: Bool
+}
+
+struct RDPDisplaySettings {
+    let desktopWidth: Int
+    let desktopHeight: Int
+    let sessionBpp: Int
+    let desktopScaleFactor: Int
+    let smartSizing: Bool
+    let compression: Int
+    let bitmapCachePersistEnable: Bool
+    let disableWallpaper: Bool
+    let allowFontSmoothing: Bool
+    let screenModeId: Int
+}
+```
+
+**职责:**
+- 检测主显示器和所有显示器的配置信息
+- 识别HiDPI（Retina）显示器
+- 计算最优的RDP显示参数
+- 根据网络条件调整显示质量设置
+- 支持多显示器环境的配置优化
+
+### 5.2. RDP配置优化器 (RDPConfigOptimizer)
+```swift
+protocol RDPConfigOptimizerProtocol {
+    func optimizeForDisplay(_ display: DisplayConfiguration) -> RDPDisplaySettings
+    func optimizeForNetwork(_ networkCondition: NetworkCondition) -> RDPDisplaySettings
+    func generateRDPConfigString(_ settings: RDPDisplaySettings, connectionInfo: RDPConnectionInfo) -> String
+}
+
+enum NetworkCondition {
+    case highSpeed      // > 100 Mbps
+    case mediumSpeed    // 10-100 Mbps  
+    case lowSpeed       // < 10 Mbps
+    case unknown
+}
+
+enum DisplayQualityProfile {
+    case performance    // 优先性能
+    case balanced      // 平衡模式
+    case quality       // 优先质量
+    case custom        // 自定义配置
+}
+```
+
+**职责:**
+- 根据显示器特性优化RDP配置参数
+- 根据网络条件调整压缩和质量设置
+- 生成完整的RDP配置文件内容
+- 支持不同的质量配置文件
+- 处理特殊显示器配置（超宽屏、4K等）
 
 ### 6. SSH终端集成器 (SSHTerminalIntegrator)
 ```swift
@@ -195,6 +267,13 @@ enum JMSError: LocalizedError {
     case terminalNotAvailable
     case sshConnectionFailed
     case expectToolNotFound
+    
+    // 显示相关错误
+    case displayDetectionFailed
+    case unsupportedDisplayConfiguration
+    case rdpConfigGenerationFailed
+    case invalidDisplayParameters
+    case hiDPIConfigurationFailed
 }
 
 protocol ErrorHandlerProtocol {
@@ -235,10 +314,30 @@ enum ConnectionInfo {
 struct RDPConnectionInfo {
     let fullAddress: String      // "develop-jumpserver.jlcops.com:3389"
     let username: String         // "gongdewei|923dbe1e-874a-4512-8a9a-6e8f7744bf53"
-    let sessionBpp: Int?         // 会话颜色深度
-    let audioMode: Int?          // 音频模式
+    
+    // 显示配置参数（基于显示器检测优化）
+    let desktopWidth: Int?       // 桌面宽度
+    let desktopHeight: Int?      // 桌面高度
+    let sessionBpp: Int?         // 会话颜色深度 (16/24/32)
+    let desktopScaleFactor: Int? // 桌面缩放因子 (100/125/150/200)
+    
+    // 显示质量参数
+    let compression: Int?        // 压缩级别 (0=无压缩, 1=RDP6.0, 2=RDP6.1)
+    let bitmapCachePersistEnable: Bool? // 位图缓存持久化
     let smartSizing: Bool?       // 智能调整大小
-    let screenModeId: Int?       // 屏幕模式
+    let allowFontSmoothing: Bool? // 字体平滑
+    
+    // 音频和外设参数
+    let audioMode: Int?          // 音频模式 (0=本地播放, 1=远程播放, 2=禁用)
+    let disableWallpaper: Bool?  // 禁用壁纸
+    let disableFullWindowDrag: Bool? // 禁用完整窗口拖拽
+    let disableMenuAnims: Bool?  // 禁用菜单动画
+    let disableThemes: Bool?     // 禁用主题
+    
+    // 屏幕和连接参数
+    let screenModeId: Int?       // 屏幕模式 (1=窗口, 2=全屏)
+    let connectionType: Int?     // 连接类型 (1=调制解调器, 2=低速宽带, 6=宽带)
+    let networkAutoDetect: Bool? // 网络自动检测
     
     // 从config字符串解析的其他RDP参数
     let additionalConfig: [String: String]
@@ -362,17 +461,164 @@ class NotificationManager {
 ```
 
 ### Microsoft Remote Desktop启动机制
-使用NSWorkspace API启动外部应用程序：
+使用NSWorkspace API启动外部应用程序，并集成显示器检测和配置优化：
 
 ```swift
-func launchRemoteDesktop(with connectionInfo: ConnectionInfo) throws {
-    // 创建临时RDP文件
-    let rdpContent = generateRDPContent(from: connectionInfo)
+func launchRemoteDesktop(with connectionInfo: RDPConnectionInfo) throws {
+    // 检测显示器配置
+    let displayDetector = DisplayDetector()
+    let primaryDisplay = displayDetector.detectPrimaryDisplay()
+    let rdpSettings = displayDetector.getOptimalRDPSettings()
+    
+    // 优化RDP配置
+    let configOptimizer = RDPConfigOptimizer()
+    let optimizedSettings = configOptimizer.optimizeForDisplay(primaryDisplay)
+    
+    // 生成优化的RDP配置内容
+    let rdpContent = configOptimizer.generateRDPConfigString(optimizedSettings, connectionInfo: connectionInfo)
     let tempURL = createTemporaryRDPFile(content: rdpContent)
     
     // 启动Microsoft Remote Desktop
     let workspace = NSWorkspace.shared
     try workspace.open(tempURL, withApplication: "Microsoft Remote Desktop")
+}
+
+// 显示器检测实现
+class DisplayDetector: DisplayDetectorProtocol {
+    func detectPrimaryDisplay() -> DisplayConfiguration {
+        guard let screen = NSScreen.main else {
+            throw JMSError.displayDetectionFailed
+        }
+        
+        let frame = screen.frame
+        let scaleFactor = screen.backingScaleFactor
+        let colorDepth = NSBitsPerPixelFromDepth(screen.depth)
+        
+        return DisplayConfiguration(
+            width: Int(frame.width * scaleFactor),
+            height: Int(frame.height * scaleFactor),
+            scaleFactor: scaleFactor,
+            colorDepth: colorDepth,
+            refreshRate: 60, // 默认值，可通过Core Graphics API获取
+            isRetina: scaleFactor > 1.0,
+            isExternal: screen != NSScreen.main
+        )
+    }
+    
+    func detectAllDisplays() -> [DisplayConfiguration] {
+        return NSScreen.screens.map { screen in
+            let frame = screen.frame
+            let scaleFactor = screen.backingScaleFactor
+            let colorDepth = NSBitsPerPixelFromDepth(screen.depth)
+            
+            return DisplayConfiguration(
+                width: Int(frame.width * scaleFactor),
+                height: Int(frame.height * scaleFactor),
+                scaleFactor: scaleFactor,
+                colorDepth: colorDepth,
+                refreshRate: 60,
+                isRetina: scaleFactor > 1.0,
+                isExternal: screen != NSScreen.main
+            )
+        }
+    }
+    
+    func isHiDPIDisplay() -> Bool {
+        return NSScreen.main?.backingScaleFactor ?? 1.0 > 1.0
+    }
+    
+    func getOptimalRDPSettings() -> RDPDisplaySettings {
+        let display = detectPrimaryDisplay()
+        let optimizer = RDPConfigOptimizer()
+        return optimizer.optimizeForDisplay(display)
+    }
+}
+
+// RDP配置优化实现
+class RDPConfigOptimizer: RDPConfigOptimizerProtocol {
+    func optimizeForDisplay(_ display: DisplayConfiguration) -> RDPDisplaySettings {
+        // 根据显示器特性计算最优设置
+        let desktopWidth = min(display.width, 3840) // 限制最大4K分辨率
+        let desktopHeight = min(display.height, 2160)
+        
+        // HiDPI显示器优化
+        let desktopScaleFactor = display.isRetina ? Int(display.scaleFactor * 100) : 100
+        let sessionBpp = display.colorDepth >= 32 ? 32 : 24
+        
+        // 质量优化设置
+        let compression = display.isRetina ? 0 : 1 // Retina显示器使用无压缩
+        let smartSizing = true // 启用智能调整
+        let allowFontSmoothing = display.isRetina // Retina显示器启用字体平滑
+        
+        return RDPDisplaySettings(
+            desktopWidth: desktopWidth,
+            desktopHeight: desktopHeight,
+            sessionBpp: sessionBpp,
+            desktopScaleFactor: desktopScaleFactor,
+            smartSizing: smartSizing,
+            compression: compression,
+            bitmapCachePersistEnable: true,
+            disableWallpaper: false, // 保持完整桌面体验
+            allowFontSmoothing: allowFontSmoothing,
+            screenModeId: 2 // 全屏模式
+        )
+    }
+    
+    func optimizeForNetwork(_ networkCondition: NetworkCondition) -> RDPDisplaySettings {
+        // 根据网络条件调整设置
+        switch networkCondition {
+        case .highSpeed:
+            return RDPDisplaySettings(
+                desktopWidth: 3840, desktopHeight: 2160,
+                sessionBpp: 32, desktopScaleFactor: 100,
+                smartSizing: true, compression: 0,
+                bitmapCachePersistEnable: true, disableWallpaper: false,
+                allowFontSmoothing: true, screenModeId: 2
+            )
+        case .mediumSpeed:
+            return RDPDisplaySettings(
+                desktopWidth: 1920, desktopHeight: 1080,
+                sessionBpp: 24, desktopScaleFactor: 100,
+                smartSizing: true, compression: 1,
+                bitmapCachePersistEnable: true, disableWallpaper: true,
+                allowFontSmoothing: false, screenModeId: 2
+            )
+        case .lowSpeed:
+            return RDPDisplaySettings(
+                desktopWidth: 1366, desktopHeight: 768,
+                sessionBpp: 16, desktopScaleFactor: 100,
+                smartSizing: true, compression: 2,
+                bitmapCachePersistEnable: false, disableWallpaper: true,
+                allowFontSmoothing: false, screenModeId: 1
+            )
+        case .unknown:
+            return optimizeForDisplay(DisplayDetector().detectPrimaryDisplay())
+        }
+    }
+    
+    func generateRDPConfigString(_ settings: RDPDisplaySettings, connectionInfo: RDPConnectionInfo) -> String {
+        var config = """
+        full address:s:\(connectionInfo.fullAddress)
+        username:s:\(connectionInfo.username)
+        desktopwidth:i:\(settings.desktopWidth)
+        desktopheight:i:\(settings.desktopHeight)
+        session bpp:i:\(settings.sessionBpp)
+        desktopscalefactor:i:\(settings.desktopScaleFactor)
+        smart sizing:i:\(settings.smartSizing ? 1 : 0)
+        compression:i:\(settings.compression)
+        bitmapcachepersistenable:i:\(settings.bitmapCachePersistEnable ? 1 : 0)
+        disable wallpaper:i:\(settings.disableWallpaper ? 1 : 0)
+        allow font smoothing:i:\(settings.allowFontSmoothing ? 1 : 0)
+        screen mode id:i:\(settings.screenModeId)
+        """
+        
+        // 添加其他配置参数
+        for (key, value) in connectionInfo.additionalConfig {
+            config += "\n\(key):\(value)"
+        }
+        
+        return config
+    }
 }
 ```
 

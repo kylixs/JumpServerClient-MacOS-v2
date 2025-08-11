@@ -36,7 +36,7 @@ xcuserdata/
 *.xccheckout
 
 ## compatibility with Xcode 3 and earlier (ignoring not required starting Xcode 4)
-build/
+/build/
 DerivedData/
 *.moved-aside
 *.pbxuser
@@ -243,6 +243,18 @@ test_results/
 # But ignore temporary distribution files
 dist/
 temp_dist/
+
+# Build configuration
+build-paths.xcconfig
+.build-config
+
+# Custom build directories
+build/xcode/
+build/swift-build/
+build/derived-data/
+build/temp/
+build/artifacts/
+
 
 # Build configuration
 build-paths.xcconfig

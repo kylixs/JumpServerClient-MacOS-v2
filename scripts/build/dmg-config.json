@@ -1,0 +1,44 @@
+{
+  "dmg": {
+    "title": "JMS Protocol Handler",
+    "version": "1.0.0",
+    "filename": "JMS-Protocol-Handler-v1.0.0.dmg",
+    "background": "assets/dmg-background.png",
+    "icon_size": 80,
+    "window": {
+      "width": 600,
+      "height": 400,
+      "x": 200,
+      "y": 120
+    },
+    "contents": [
+      {
+        "x": 140,
+        "y": 200,
+        "type": "file",
+        "path": "JMSProtocolHandler.app"
+      },
+      {
+        "x": 460,
+        "y": 200,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ],
+    "format": "UDZO",
+    "compression": "zlib",
+    "filesystem": "HFS+",
+    "volume_name": "JMS Protocol Handler Installer"
+  },
+  "signing": {
+    "enabled": false,
+    "identity": "",
+    "entitlements": "JMSProtocolHandler/JMSProtocolHandler.entitlements"
+  },
+  "notarization": {
+    "enabled": false,
+    "apple_id": "",
+    "team_id": "",
+    "app_password": ""
+  }
+}

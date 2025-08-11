@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "name": "Code Quality Analyzer",
+  "description": "Monitors Swift source code files for changes and provides automated code quality analysis including code smells detection, design pattern suggestions, and best practices recommendations",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "JMSProtocolHandler/JMSProtocolHandler/**/*.swift",
+      "JMSProtocolHandler/JMSProtocolHandlerTests/**/*.swift",
+      "JMSProtocolHandler/Sources/**/*.swift",
+      "JMSProtocolHandler/Tests/**/*.swift",
+      "tests/**/*.swift"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the modified Swift code files for potential improvements. Focus on:\n\n1. **Code Smells**: Identify long methods, large classes, duplicate code, complex conditionals, and other maintainability issues\n2. **Design Patterns**: Suggest appropriate design patterns that could improve the code structure (Observer, Strategy, Factory, etc.)\n3. **Swift Best Practices**: Check for proper use of optionals, error handling, memory management, protocol conformance, and Swift idioms\n4. **Performance Optimizations**: Identify potential performance bottlenecks and suggest optimizations while maintaining functionality\n5. **Readability & Maintainability**: Suggest improvements for variable naming, method organization, code documentation, and overall clarity\n\nFor each suggestion, provide:\n- Clear explanation of the issue or improvement opportunity\n- Specific code examples showing the current approach and recommended changes\n- Rationale for why the change improves code quality\n- Impact assessment (readability, performance, maintainability)\n\nMaintain focus on the existing functionality while suggesting incremental improvements that enhance code quality."
+  }
+}
