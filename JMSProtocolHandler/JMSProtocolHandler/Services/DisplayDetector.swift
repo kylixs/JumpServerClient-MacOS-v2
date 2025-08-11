@@ -91,34 +91,3 @@ class DisplayDetector: DisplayDetectorProtocol {
         return Int(mode.refreshRate)
     }
 }
-
-/// RDP配置优化器（临时实现，将在任务8中完善）
-class RDPConfigOptimizer {
-    func optimizeForDisplay(_ display: DisplayConfiguration) -> RDPDisplaySettings {
-        // 根据显示器特性计算最优设置
-        let desktopWidth = min(display.width, 3840) // 限制最大4K分辨率
-        let desktopHeight = min(display.height, 2160)
-        
-        // HiDPI显示器优化
-        let desktopScaleFactor = display.isRetina ? Int(display.scaleFactor * 100) : 100
-        let sessionBpp = display.colorDepth >= 32 ? 32 : 24
-        
-        // 质量优化设置
-        let compression = display.isRetina ? 0 : 1 // Retina显示器使用无压缩
-        let smartSizing = true // 启用智能调整
-        let allowFontSmoothing = display.isRetina // Retina显示器启用字体平滑
-        
-        return RDPDisplaySettings(
-            desktopWidth: desktopWidth,
-            desktopHeight: desktopHeight,
-            sessionBpp: sessionBpp,
-            desktopScaleFactor: desktopScaleFactor,
-            smartSizing: smartSizing,
-            compression: compression,
-            bitmapCachePersistEnable: true,
-            disableWallpaper: false, // 保持完整桌面体验
-            allowFontSmoothing: allowFontSmoothing,
-            screenModeId: 2 // 全屏模式
-        )
-    }
-}
