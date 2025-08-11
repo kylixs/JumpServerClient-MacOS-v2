@@ -85,59 +85,6 @@ class RDPConfigOptimizerTests: XCTestCase {
         XCTAssertEqual(settings.desktopHeight % 16, 0, "高度应是16的倍数")
     }
     
-    // MARK: - Network Optimization Tests
-    
-    func testOptimizeForNetwork_HighSpeed() {
-        // Given & When
-        let settings = optimizer.optimizeForNetwork(.highSpeed)
-        
-        // Then
-        XCTAssertEqual(settings.desktopWidth, 3840, "高速网络应支持4K分辨率")
-        XCTAssertEqual(settings.desktopHeight, 2160, "高速网络应支持4K分辨率")
-        XCTAssertEqual(settings.sessionBpp, 32, "高速网络应使用32位颜色深度")
-        XCTAssertEqual(settings.compression, 0, "高速网络应使用无压缩")
-        XCTAssertTrue(settings.bitmapCachePersistEnable, "高速网络应启用位图缓存")
-        XCTAssertFalse(settings.disableWallpaper, "高速网络应保持壁纸")
-        XCTAssertTrue(settings.allowFontSmoothing, "高速网络应启用字体平滑")
-    }
-    
-    func testOptimizeForNetwork_MediumSpeed() {
-        // Given & When
-        let settings = optimizer.optimizeForNetwork(.mediumSpeed)
-        
-        // Then
-        XCTAssertEqual(settings.desktopWidth, 1920, "中速网络应使用1080p分辨率")
-        XCTAssertEqual(settings.desktopHeight, 1080, "中速网络应使用1080p分辨率")
-        XCTAssertEqual(settings.sessionBpp, 24, "中速网络应使用24位颜色深度")
-        XCTAssertEqual(settings.compression, 1, "中速网络应使用适度压缩")
-        XCTAssertTrue(settings.disableWallpaper, "中速网络应禁用壁纸")
-        XCTAssertFalse(settings.allowFontSmoothing, "中速网络应禁用字体平滑")
-    }
-    
-    func testOptimizeForNetwork_LowSpeed() {
-        // Given & When
-        let settings = optimizer.optimizeForNetwork(.lowSpeed)
-        
-        // Then
-        XCTAssertEqual(settings.desktopWidth, 1366, "低速网络应使用较低分辨率")
-        XCTAssertEqual(settings.desktopHeight, 768, "低速网络应使用较低分辨率")
-        XCTAssertEqual(settings.sessionBpp, 16, "低速网络应使用16位颜色深度")
-        XCTAssertEqual(settings.compression, 2, "低速网络应使用最高压缩")
-        XCTAssertFalse(settings.bitmapCachePersistEnable, "低速网络应禁用位图缓存")
-        XCTAssertEqual(settings.screenModeId, 1, "低速网络应使用窗口模式")
-    }
-    
-    func testOptimizeForNetwork_Unknown() {
-        // Given & When
-        let settings = optimizer.optimizeForNetwork(.unknown)
-        
-        // Then
-        XCTAssertEqual(settings.desktopWidth, 1920, "未知网络应使用保守的1080p分辨率")
-        XCTAssertEqual(settings.desktopHeight, 1080, "未知网络应使用保守的1080p分辨率")
-        XCTAssertEqual(settings.sessionBpp, 24, "未知网络应使用24位颜色深度")
-        XCTAssertEqual(settings.compression, 1, "未知网络应使用适度压缩")
-    }
-    
     // MARK: - Quality Profile Tests
     
     func testOptimizeForProfile_Performance() {
@@ -213,17 +160,6 @@ class RDPConfigOptimizerTests: XCTestCase {
         XCTAssertTrue(configString.contains("connection type:i:6"), "应包含连接类型")
         XCTAssertTrue(configString.contains("audiomode:i:0"), "应包含音频设置")
         XCTAssertTrue(configString.contains("redirectclipboard:i:1"), "应包含剪贴板重定向")
-    }
-    
-    // MARK: - Network Detection Tests
-    
-    func testDetectNetworkCondition() {
-        // Given & When
-        let networkCondition = optimizer.detectNetworkCondition()
-        
-        // Then
-        XCTAssertNotEqual(networkCondition, .unknown, "网络检测应返回有效结果")
-        // 注意：实际的网络条件取决于运行环境，这里只验证方法能正常执行
     }
     
     // MARK: - Validation Tests

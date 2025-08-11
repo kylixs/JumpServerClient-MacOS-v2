@@ -6,8 +6,6 @@
 //
 
 import Foundation
-import Network
-import SystemConfiguration
 
 /// RDP配置优化器实现
 class RDPConfigOptimizer: RDPConfigOptimizerProtocol {
@@ -24,7 +22,7 @@ class RDPConfigOptimizer: RDPConfigOptimizerProtocol {
         let desktopScaleFactor = calculateScaleFactor(for: display)
         let sessionBpp = calculateColorDepth(for: display)
         
-        // 质量优化设置
+        // 使用全局配置的质量设置
         let compression = display.isRetina ? 0 : 1 // Retina显示器使用无压缩
         let smartSizing = true // 启用智能调整
         let allowFontSmoothing = display.isRetina // Retina显示器启用字体平滑
@@ -41,45 +39,6 @@ class RDPConfigOptimizer: RDPConfigOptimizerProtocol {
             allowFontSmoothing: allowFontSmoothing,
             screenModeId: 2 // 全屏模式
         )
-    }
-    
-    /// 根据网络条件优化RDP配置
-    func optimizeForNetwork(_ networkCondition: NetworkCondition) -> RDPDisplaySettings {
-        switch networkCondition {
-        case .highSpeed:
-            return RDPDisplaySettings(
-                desktopWidth: 3840, desktopHeight: 2160,
-                sessionBpp: 32, desktopScaleFactor: 100,
-                smartSizing: true, compression: 0,
-                bitmapCachePersistEnable: true, disableWallpaper: false,
-                allowFontSmoothing: true, screenModeId: 2
-            )
-        case .mediumSpeed:
-            return RDPDisplaySettings(
-                desktopWidth: 1920, desktopHeight: 1080,
-                sessionBpp: 24, desktopScaleFactor: 100,
-                smartSizing: true, compression: 1,
-                bitmapCachePersistEnable: true, disableWallpaper: true,
-                allowFontSmoothing: false, screenModeId: 2
-            )
-        case .lowSpeed:
-            return RDPDisplaySettings(
-                desktopWidth: 1366, desktopHeight: 768,
-                sessionBpp: 16, desktopScaleFactor: 100,
-                smartSizing: true, compression: 2,
-                bitmapCachePersistEnable: false, disableWallpaper: true,
-                allowFontSmoothing: false, screenModeId: 1
-            )
-        case .unknown:
-            // 使用保守的默认设置
-            return RDPDisplaySettings(
-                desktopWidth: 1920, desktopHeight: 1080,
-                sessionBpp: 24, desktopScaleFactor: 100,
-                smartSizing: true, compression: 1,
-                bitmapCachePersistEnable: true, disableWallpaper: false,
-                allowFontSmoothing: false, screenModeId: 2
-            )
-        }
     }
     
     /// 根据质量配置文件优化RDP配置
@@ -171,42 +130,6 @@ class RDPConfigOptimizer: RDPConfigOptimizerProtocol {
         }
         
         return config
-    }
-    
-    /// 检测网络条件
-    func detectNetworkCondition() -> NetworkCondition {
-        // 使用Network框架检测网络状态
-        let monitor = NWPathMonitor()
-        var networkCondition: NetworkCondition = .unknown
-        
-        let semaphore = DispatchSemaphore(value: 0)
-        
-        monitor.pathUpdateHandler = { path in
-            if path.status == .satisfied {
-                // 检查网络接口类型
-                if path.usesInterfaceType(.wifi) {
-                    networkCondition = .mediumSpeed
-                } else if path.usesInterfaceType(.wiredEthernet) {
-                    networkCondition = .highSpeed
-                } else if path.usesInterfaceType(.cellular) {
-                    networkCondition = .lowSpeed
-                } else {
-                    networkCondition = .unknown
-                }
-            } else {
-                networkCondition = .unknown
-            }
-            semaphore.signal()
-        }
-        
-        let queue = DispatchQueue(label: "NetworkMonitor")
-        monitor.start(queue: queue)
-        
-        // 等待网络检测完成（最多1秒）
-        _ = semaphore.wait(timeout: .now() + 1.0)
-        monitor.cancel()
-        
-        return networkCondition
     }
     
     /// 验证RDP设置的有效性

@@ -198,22 +198,13 @@ struct RDPDisplaySettings {
 - 检测主显示器和所有显示器的配置信息
 - 识别HiDPI（Retina）显示器
 - 计算最优的RDP显示参数
-- 根据网络条件调整显示质量设置
 - 支持多显示器环境的配置优化
 
 ### 5.2. RDP配置优化器 (RDPConfigOptimizer)
 ```swift
 protocol RDPConfigOptimizerProtocol {
     func optimizeForDisplay(_ display: DisplayConfiguration) -> RDPDisplaySettings
-    func optimizeForNetwork(_ networkCondition: NetworkCondition) -> RDPDisplaySettings
     func generateRDPConfigString(_ settings: RDPDisplaySettings, connectionInfo: RDPConnectionInfo) -> String
-}
-
-enum NetworkCondition {
-    case highSpeed      // > 100 Mbps
-    case mediumSpeed    // 10-100 Mbps  
-    case lowSpeed       // < 10 Mbps
-    case unknown
 }
 
 enum DisplayQualityProfile {
@@ -226,7 +217,7 @@ enum DisplayQualityProfile {
 
 **职责:**
 - 根据显示器特性优化RDP配置参数
-- 根据网络条件调整压缩和质量设置
+- 使用全局配置的压缩和质量设置
 - 生成完整的RDP配置文件内容
 - 支持不同的质量配置文件
 - 处理特殊显示器配置（超宽屏、4K等）
@@ -562,38 +553,6 @@ class RDPConfigOptimizer: RDPConfigOptimizerProtocol {
             allowFontSmoothing: allowFontSmoothing,
             screenModeId: 2 // 全屏模式
         )
-    }
-    
-    func optimizeForNetwork(_ networkCondition: NetworkCondition) -> RDPDisplaySettings {
-        // 根据网络条件调整设置
-        switch networkCondition {
-        case .highSpeed:
-            return RDPDisplaySettings(
-                desktopWidth: 3840, desktopHeight: 2160,
-                sessionBpp: 32, desktopScaleFactor: 100,
-                smartSizing: true, compression: 0,
-                bitmapCachePersistEnable: true, disableWallpaper: false,
-                allowFontSmoothing: true, screenModeId: 2
-            )
-        case .mediumSpeed:
-            return RDPDisplaySettings(
-                desktopWidth: 1920, desktopHeight: 1080,
-                sessionBpp: 24, desktopScaleFactor: 100,
-                smartSizing: true, compression: 1,
-                bitmapCachePersistEnable: true, disableWallpaper: true,
-                allowFontSmoothing: false, screenModeId: 2
-            )
-        case .lowSpeed:
-            return RDPDisplaySettings(
-                desktopWidth: 1366, desktopHeight: 768,
-                sessionBpp: 16, desktopScaleFactor: 100,
-                smartSizing: true, compression: 2,
-                bitmapCachePersistEnable: false, disableWallpaper: true,
-                allowFontSmoothing: false, screenModeId: 1
-            )
-        case .unknown:
-            return optimizeForDisplay(DisplayDetector().detectPrimaryDisplay())
-        }
     }
     
     func generateRDPConfigString(_ settings: RDPDisplaySettings, connectionInfo: RDPConnectionInfo) -> String {

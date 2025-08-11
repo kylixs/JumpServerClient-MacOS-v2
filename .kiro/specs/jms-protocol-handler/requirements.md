@@ -135,12 +135,12 @@
 
 ### Requirement 9
 
-**User Story:** 作为开发者和系统管理员，我希望能够根据不同的使用场景和网络环境自定义RDP显示配置，这样我就能在性能和质量之间找到最佳平衡。
+**User Story:** 作为开发者和系统管理员，我希望能够根据不同的使用场景自定义RDP显示配置，这样我就能在性能和质量之间找到最佳平衡。
 
 #### Acceptance Criteria - 配置文件增强
 
 1. WHEN 生成RDP配置文件 THEN 系统 SHALL 包含完整的显示优化参数集
-2. WHEN 检测到低带宽网络 THEN 系统 SHALL 自动调整压缩和质量参数
-3. WHEN 用户需要最佳性能 THEN 系统 SHALL 提供性能优化的配置选项
-4. WHEN 用户需要最佳质量 THEN 系统 SHALL 提供质量优化的配置选项
-5. WHEN 配置RDP参数 THEN 系统 SHALL 支持自定义显示配置的扩展
+2. WHEN 用户需要最佳性能 THEN 系统 SHALL 提供性能优化的配置选项
+3. WHEN 用户需要最佳质量 THEN 系统 SHALL 提供质量优化的配置选项
+4. WHEN 配置RDP参数 THEN 系统 SHALL 支持自定义显示配置的扩展
+5. WHEN 应用程序启动 THEN 系统 SHALL 使用全局配置的压缩和质量参数
