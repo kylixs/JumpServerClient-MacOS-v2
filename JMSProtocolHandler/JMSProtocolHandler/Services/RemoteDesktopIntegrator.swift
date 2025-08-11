@@ -20,12 +20,22 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
     /// 临时文件目录
     private let temporaryDirectory: URL
     
+    /// 显示器检测器
+    private let displayDetector: DisplayDetector
+    
+    /// RDP配置优化器
+    private let configOptimizer: RDPConfigOptimizer
+    
     // MARK: - Initialization
     
     init() {
         // 创建临时目录用于存储RDP文件
         self.temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("JMSProtocolHandler", isDirectory: true)
+        
+        // 初始化显示优化组件
+        self.displayDetector = DisplayDetector()
+        self.configOptimizer = RDPConfigOptimizer()
         
         // 确保临时目录存在
         try? FileManager.default.createDirectory(at: temporaryDirectory, 
@@ -52,39 +62,20 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
         return false
     }
     
-    func createTemporaryRDPFile(with connectionInfo: RDPConnectionInfo) throws -> URL {
-        // 验证连接信息
-        try connectionInfo.validate()
-        
-        // 生成唯一的文件名
-        let fileName = "jms_connection_\(UUID().uuidString).rdp"
-        let fileURL = temporaryDirectory.appendingPathComponent(fileName)
-        
-        // 生成RDP文件内容
-        let rdpContent = connectionInfo.generateRDPContent()
-        
-        do {
-            // 写入RDP文件
-            try rdpContent.write(to: fileURL, atomically: true, encoding: .utf8)
-            
-            // 设置文件权限（只有当前用户可读写）
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], 
-                                                ofItemAtPath: fileURL.path)
-            
-            return fileURL
-        } catch {
-            throw JMSError.remoteDesktopLaunchFailed
-        }
+    func launchRemoteDesktop(with connectionInfo: RDPConnectionInfo) throws {
+        // 使用显示优化的方式启动
+        let displaySettings = try detectAndOptimizeDisplay()
+        try launchOptimizedRemoteDesktop(with: connectionInfo, displaySettings: displaySettings)
     }
     
-    func launchRemoteDesktop(with connectionInfo: RDPConnectionInfo) throws {
+    func launchOptimizedRemoteDesktop(with connectionInfo: RDPConnectionInfo, displaySettings: RDPDisplaySettings) throws {
         // 检查Microsoft Remote Desktop是否可用
         guard checkRemoteDesktopAvailability() else {
             throw JMSError.remoteDesktopNotFound
         }
         
-        // 创建临时RDP文件
-        let rdpFileURL = try createTemporaryRDPFile(with: connectionInfo)
+        // 创建优化的临时RDP文件
+        let rdpFileURL = try createOptimizedRDPFile(with: connectionInfo, displaySettings: displaySettings)
         
         do {
             // 方法1: 尝试使用Bundle ID启动应用程序
@@ -109,6 +100,56 @@ class RemoteDesktopIntegrator: RemoteDesktopIntegratorProtocol {
             // 清理临时文件
             cleanupTemporaryFile(at: rdpFileURL)
             throw JMSError.remoteDesktopLaunchFailed
+        }
+    }
+    
+    func createTemporaryRDPFile(with connectionInfo: RDPConnectionInfo) throws -> URL {
+        // 使用显示优化的方式创建文件
+        let displaySettings = try detectAndOptimizeDisplay()
+        return try createOptimizedRDPFile(with: connectionInfo, displaySettings: displaySettings)
+    }
+    
+    func createOptimizedRDPFile(with connectionInfo: RDPConnectionInfo, displaySettings: RDPDisplaySettings) throws -> URL {
+        // 验证连接信息
+        try connectionInfo.validate()
+        
+        // 验证显示设置
+        guard configOptimizer.validateRDPSettings(displaySettings) else {
+            throw JMSError.invalidDisplayParameters
+        }
+        
+        // 生成唯一的文件名
+        let fileName = "jms_optimized_\(UUID().uuidString).rdp"
+        let fileURL = temporaryDirectory.appendingPathComponent(fileName)
+        
+        // 生成优化的RDP文件内容
+        let rdpContent = configOptimizer.generateRDPConfigString(displaySettings, connectionInfo: connectionInfo)
+        
+        do {
+            // 写入RDP文件
+            try rdpContent.write(to: fileURL, atomically: true, encoding: .utf8)
+            
+            // 设置文件权限（只有当前用户可读写）
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], 
+                                                ofItemAtPath: fileURL.path)
+            
+            return fileURL
+        } catch {
+            throw JMSError.rdpConfigGenerationFailed
+        }
+    }
+    
+    func detectAndOptimizeDisplay() throws -> RDPDisplaySettings {
+        do {
+            // 检测主显示器配置
+            let displayConfig = try displayDetector.detectPrimaryDisplay()
+            
+            // 根据显示器特性优化RDP设置
+            let optimizedSettings = configOptimizer.optimizeForDisplay(displayConfig)
+            
+            return optimizedSettings
+        } catch {
+            throw JMSError.displayDetectionFailed
         }
     }
     
