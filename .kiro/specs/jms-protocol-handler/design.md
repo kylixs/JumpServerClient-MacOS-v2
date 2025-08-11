@@ -222,6 +222,131 @@ enum DisplayQualityProfile {
 - 支持不同的质量配置文件
 - 处理特殊显示器配置（超宽屏、4K等）
 
+### 5.3. RDP质量配置管理器 (RDPQualityConfigManager) 🆕
+```swift
+protocol RDPQualityConfigManagerProtocol {
+    func getCurrentQualityProfile() -> DisplayQualityProfile
+    func setQualityProfile(_ profile: DisplayQualityProfile)
+    func getCustomConfiguration() -> RDPCustomConfiguration?
+    func saveCustomConfiguration(_ config: RDPCustomConfiguration)
+    func resetToDefaultConfiguration()
+    func getQualityProfileSettings(_ profile: DisplayQualityProfile) -> RDPQualitySettings
+    func validateConfiguration(_ config: RDPCustomConfiguration) -> ValidationResult
+}
+
+struct RDPQualitySettings {
+    let compressionLevel: Int           // 0-2 (0=无压缩, 1=RDP6.0, 2=RDP6.1)
+    let colorDepth: Int                // 16/24/32 位
+    let enableFontSmoothing: Bool      // 字体平滑
+    let enableWallpaper: Bool          // 桌面壁纸
+    let enableMenuAnimations: Bool     // 菜单动画
+    let enableThemes: Bool             // 视觉主题
+    let enableFullWindowDrag: Bool     // 完整窗口拖拽
+    let bitmapCaching: Bool            // 位图缓存
+    let audioQuality: AudioQuality     // 音频质量
+    let networkOptimization: NetworkOptimization // 网络优化
+    
+    // 性能影响评估
+    let estimatedBandwidth: String     // 预估带宽需求
+    let performanceImpact: PerformanceLevel // 性能影响级别
+    let qualityLevel: QualityLevel     // 质量级别
+}
+
+struct RDPCustomConfiguration {
+    let name: String                   // 自定义配置名称
+    let settings: RDPQualitySettings   // 质量设置
+    let displayOptimization: Bool      // 是否启用显示器优化
+    let createdDate: Date             // 创建时间
+    let lastModified: Date            // 最后修改时间
+}
+
+enum AudioQuality {
+    case disabled                      // 禁用音频
+    case low                          // 低质量
+    case medium                       // 中等质量
+    case high                         // 高质量
+}
+
+enum NetworkOptimization {
+    case modem                        // 调制解调器
+    case lowBroadband                 // 低速宽带
+    case broadband                    // 宽带
+    case lan                          // 局域网
+    case auto                         // 自动检测
+}
+
+enum PerformanceLevel {
+    case low, medium, high
+}
+
+enum QualityLevel {
+    case basic, standard, premium, ultra
+}
+
+enum ValidationResult {
+    case valid
+    case invalid(reasons: [String])
+}
+```
+
+**职责:**
+- 管理RDP质量配置文件的存储和检索
+- 提供预设质量配置文件（性能/平衡/质量）
+- 支持用户自定义配置的创建和管理
+- 验证配置参数的有效性和兼容性
+- 提供配置对性能和质量影响的评估
+- 持久化存储用户配置偏好
+
+### 5.4. 配置界面控制器 (ConfigurationViewController) 🆕
+```swift
+protocol ConfigurationViewControllerProtocol {
+    func showQualityConfigurationPanel()
+    func displayQualityProfiles()
+    func showCustomConfigurationEditor()
+    func previewConfiguration(_ config: RDPQualitySettings)
+    func applyConfiguration(_ profile: DisplayQualityProfile)
+    func resetConfiguration()
+    func exportConfiguration() -> String
+    func importConfiguration(_ configString: String) -> Bool
+}
+
+class ConfigurationViewController: NSViewController {
+    @IBOutlet weak var qualityProfileSegmentedControl: NSSegmentedControl!
+    @IBOutlet weak var customConfigurationPanel: NSView!
+    @IBOutlet weak var compressionSlider: NSSlider!
+    @IBOutlet weak var colorDepthPopup: NSPopUpButton!
+    @IBOutlet weak var fontSmoothingCheckbox: NSButton!
+    @IBOutlet weak var wallpaperCheckbox: NSButton!
+    @IBOutlet weak var animationsCheckbox: NSButton!
+    @IBOutlet weak var themesCheckbox: NSButton!
+    @IBOutlet weak var audioQualityPopup: NSPopUpButton!
+    @IBOutlet weak var networkOptimizationPopup: NSPopUpButton!
+    
+    // 预览和信息显示
+    @IBOutlet weak var bandwidthEstimateLabel: NSTextField!
+    @IBOutlet weak var performanceImpactLabel: NSTextField!
+    @IBOutlet weak var qualityLevelLabel: NSTextField!
+    @IBOutlet weak var configurationPreviewTextView: NSTextView!
+    
+    // 操作按钮
+    @IBAction func qualityProfileChanged(_ sender: NSSegmentedControl)
+    @IBAction func customParameterChanged(_ sender: Any)
+    @IBAction func previewConfiguration(_ sender: NSButton)
+    @IBAction func applyConfiguration(_ sender: NSButton)
+    @IBAction func resetToDefault(_ sender: NSButton)
+    @IBAction func exportConfiguration(_ sender: NSButton)
+    @IBAction func importConfiguration(_ sender: NSButton)
+}
+```
+
+**职责:**
+- 提供用户友好的RDP质量配置界面
+- 显示预设质量配置文件选项
+- 支持自定义配置参数的详细调整
+- 实时显示配置变更的影响预估
+- 提供配置预览和应用功能
+- 支持配置的导入导出功能
+
 ### 6. SSH终端集成器 (SSHTerminalIntegrator)
 ```swift
 protocol SSHTerminalIntegratorProtocol {
@@ -358,6 +483,114 @@ struct SSHToken: Codable {
 - `session bpp:i:32`
 - `audiomode:i:0`
 - 其他RDP标准配置参数
+
+### 质量配置持久化模型 🆕
+```swift
+struct QualityConfigurationStore: Codable {
+    let currentProfile: DisplayQualityProfile
+    let customConfigurations: [String: RDPCustomConfiguration]
+    let profileSettings: [DisplayQualityProfile: RDPQualitySettings]
+    let lastUpdated: Date
+    let version: String
+    
+    static let defaultStore = QualityConfigurationStore(
+        currentProfile: .balanced,
+        customConfigurations: [:],
+        profileSettings: [
+            .performance: RDPQualitySettings.performanceOptimized,
+            .balanced: RDPQualitySettings.balanced,
+            .quality: RDPQualitySettings.qualityOptimized
+        ],
+        lastUpdated: Date(),
+        version: "1.0"
+    )
+}
+
+extension RDPQualitySettings {
+    static let performanceOptimized = RDPQualitySettings(
+        compressionLevel: 2,           // 最高压缩
+        colorDepth: 16,               // 16位色彩
+        enableFontSmoothing: false,   // 禁用字体平滑
+        enableWallpaper: false,       // 禁用壁纸
+        enableMenuAnimations: false,  // 禁用动画
+        enableThemes: false,          // 禁用主题
+        enableFullWindowDrag: false,  // 禁用完整窗口拖拽
+        bitmapCaching: true,          // 启用位图缓存
+        audioQuality: .low,           // 低音频质量
+        networkOptimization: .broadband,
+        estimatedBandwidth: "< 1 Mbps",
+        performanceImpact: .low,
+        qualityLevel: .basic
+    )
+    
+    static let balanced = RDPQualitySettings(
+        compressionLevel: 1,           // 中等压缩
+        colorDepth: 24,               // 24位色彩
+        enableFontSmoothing: true,    // 启用字体平滑
+        enableWallpaper: false,       // 禁用壁纸
+        enableMenuAnimations: true,   // 启用动画
+        enableThemes: true,           // 启用主题
+        enableFullWindowDrag: false,  // 禁用完整窗口拖拽
+        bitmapCaching: true,          // 启用位图缓存
+        audioQuality: .medium,        // 中等音频质量
+        networkOptimization: .broadband,
+        estimatedBandwidth: "1-3 Mbps",
+        performanceImpact: .medium,
+        qualityLevel: .standard
+    )
+    
+    static let qualityOptimized = RDPQualitySettings(
+        compressionLevel: 0,           // 无压缩
+        colorDepth: 32,               // 32位色彩
+        enableFontSmoothing: true,    // 启用字体平滑
+        enableWallpaper: true,        // 启用壁纸
+        enableMenuAnimations: true,   // 启用动画
+        enableThemes: true,           // 启用主题
+        enableFullWindowDrag: true,   // 启用完整窗口拖拽
+        bitmapCaching: true,          // 启用位图缓存
+        audioQuality: .high,          // 高音频质量
+        networkOptimization: .lan,
+        estimatedBandwidth: "> 5 Mbps",
+        performanceImpact: .high,
+        qualityLevel: .premium
+    )
+}
+
+// 配置文件管理器
+class QualityConfigurationManager {
+    private let userDefaults = UserDefaults.standard
+    private let configKey = "RDPQualityConfiguration"
+    
+    func loadConfiguration() -> QualityConfigurationStore {
+        guard let data = userDefaults.data(forKey: configKey),
+              let store = try? JSONDecoder().decode(QualityConfigurationStore.self, from: data) else {
+            return QualityConfigurationStore.defaultStore
+        }
+        return store
+    }
+    
+    func saveConfiguration(_ store: QualityConfigurationStore) {
+        guard let data = try? JSONEncoder().encode(store) else { return }
+        userDefaults.set(data, forKey: configKey)
+    }
+    
+    func getCurrentProfile() -> DisplayQualityProfile {
+        return loadConfiguration().currentProfile
+    }
+    
+    func setCurrentProfile(_ profile: DisplayQualityProfile) {
+        var store = loadConfiguration()
+        store = QualityConfigurationStore(
+            currentProfile: profile,
+            customConfigurations: store.customConfigurations,
+            profileSettings: store.profileSettings,
+            lastUpdated: Date(),
+            version: store.version
+        )
+        saveConfiguration(store)
+    }
+}
+```
 
 ### SSH Token解析规则
 SSH协议的token字段包含JSON格式的连接信息：
@@ -668,18 +901,285 @@ func detectAvailableTerminal() -> TerminalApp {
 }
 ```
 
-### Expect工具可用性检查
+### 质量配置界面实现 🆕
+使用Cocoa框架创建原生macOS配置界面：
+
 ```swift
-func checkExpectAvailability() -> Bool {
-    let process = Process()
-    process.launchPath = "/usr/bin/which"
-    process.arguments = ["expect"]
+class ConfigurationWindowController: NSWindowController {
+    override func windowDidLoad() {
+        super.windowDidLoad()
+        setupQualityConfigurationUI()
+        loadCurrentConfiguration()
+    }
     
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.launch()
-    process.waitUntilExit()
+    private func setupQualityConfigurationUI() {
+        // 创建质量配置选项卡
+        let tabView = NSTabView()
+        
+        // 预设配置选项卡
+        let presetTab = NSTabViewItem(identifier: "presets")
+        presetTab.label = "预设配置"
+        presetTab.view = createPresetConfigurationView()
+        tabView.addTabViewItem(presetTab)
+        
+        // 自定义配置选项卡
+        let customTab = NSTabViewItem(identifier: "custom")
+        customTab.label = "自定义配置"
+        customTab.view = createCustomConfigurationView()
+        tabView.addTabViewItem(customTab)
+        
+        // 高级设置选项卡
+        let advancedTab = NSTabViewItem(identifier: "advanced")
+        advancedTab.label = "高级设置"
+        advancedTab.view = createAdvancedConfigurationView()
+        tabView.addTabViewItem(advancedTab)
+        
+        window?.contentView = tabView
+    }
     
-    return process.terminationStatus == 0
+    private func createPresetConfigurationView() -> NSView {
+        let view = NSView()
+        
+        // 质量配置文件选择
+        let profileMatrix = NSMatrix(frame: NSRect(x: 20, y: 200, width: 400, height: 120))
+        profileMatrix.mode = .radioMode
+        profileMatrix.addRow()
+        profileMatrix.cells[0].title = "性能优先 - 适合低带宽网络环境"
+        profileMatrix.addRow()
+        profileMatrix.cells[1].title = "平衡模式 - 性能与质量的最佳平衡"
+        profileMatrix.addRow()
+        profileMatrix.cells[2].title = "质量优先 - 适合高带宽局域网环境"
+        
+        // 配置说明标签
+        let descriptionLabel = NSTextField(labelWithString: "选择适合您网络环境的质量配置文件")
+        descriptionLabel.frame = NSRect(x: 20, y: 160, width: 400, height: 20)
+        
+        // 预估信息显示
+        let infoView = createConfigurationInfoView()
+        infoView.frame = NSRect(x: 20, y: 20, width: 400, height: 120)
+        
+        view.addSubview(profileMatrix)
+        view.addSubview(descriptionLabel)
+        view.addSubview(infoView)
+        
+        return view
+    }
+    
+    private func createCustomConfigurationView() -> NSView {
+        let view = NSView()
+        
+        // 压缩级别滑块
+        let compressionLabel = NSTextField(labelWithString: "压缩级别:")
+        compressionLabel.frame = NSRect(x: 20, y: 280, width: 100, height: 20)
+        
+        let compressionSlider = NSSlider(frame: NSRect(x: 130, y: 280, width: 200, height: 20))
+        compressionSlider.minValue = 0
+        compressionSlider.maxValue = 2
+        compressionSlider.numberOfTickMarks = 3
+        compressionSlider.allowsTickMarkValuesOnly = true
+        
+        // 颜色深度选择
+        let colorDepthLabel = NSTextField(labelWithString: "颜色深度:")
+        colorDepthLabel.frame = NSRect(x: 20, y: 240, width: 100, height: 20)
+        
+        let colorDepthPopup = NSPopUpButton(frame: NSRect(x: 130, y: 240, width: 100, height: 20))
+        colorDepthPopup.addItems(withTitles: ["16位", "24位", "32位"])
+        
+        // 特效选项复选框
+        let fontSmoothingCheckbox = NSButton(checkboxWithTitle: "启用字体平滑", target: nil, action: nil)
+        fontSmoothingCheckbox.frame = NSRect(x: 20, y: 200, width: 150, height: 20)
+        
+        let wallpaperCheckbox = NSButton(checkboxWithTitle: "显示桌面壁纸", target: nil, action: nil)
+        wallpaperCheckbox.frame = NSRect(x: 20, y: 170, width: 150, height: 20)
+        
+        let animationsCheckbox = NSButton(checkboxWithTitle: "启用菜单动画", target: nil, action: nil)
+        animationsCheckbox.frame = NSRect(x: 20, y: 140, width: 150, height: 20)
+        
+        // 音频质量选择
+        let audioLabel = NSTextField(labelWithString: "音频质量:")
+        audioLabel.frame = NSRect(x: 200, y: 200, width: 80, height: 20)
+        
+        let audioPopup = NSPopUpButton(frame: NSRect(x: 290, y: 200, width: 100, height: 20))
+        audioPopup.addItems(withTitles: ["禁用", "低质量", "中等", "高质量"])
+        
+        // 实时预览区域
+        let previewLabel = NSTextField(labelWithString: "配置预览:")
+        previewLabel.frame = NSRect(x: 20, y: 100, width: 100, height: 20)
+        
+        let previewTextView = NSTextView(frame: NSRect(x: 20, y: 20, width: 400, height: 70))
+        previewTextView.isEditable = false
+        previewTextView.backgroundColor = NSColor.controlBackgroundColor
+        
+        view.addSubview(compressionLabel)
+        view.addSubview(compressionSlider)
+        view.addSubview(colorDepthLabel)
+        view.addSubview(colorDepthPopup)
+        view.addSubview(fontSmoothingCheckbox)
+        view.addSubview(wallpaperCheckbox)
+        view.addSubview(animationsCheckbox)
+        view.addSubview(audioLabel)
+        view.addSubview(audioPopup)
+        view.addSubview(previewLabel)
+        view.addSubview(previewTextView)
+        
+        return view
+    }
+    
+    private func createConfigurationInfoView() -> NSView {
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        view.layer?.cornerRadius = 8
+        
+        let bandwidthLabel = NSTextField(labelWithString: "预估带宽需求: 1-3 Mbps")
+        bandwidthLabel.frame = NSRect(x: 10, y: 80, width: 200, height: 20)
+        
+        let performanceLabel = NSTextField(labelWithString: "性能影响: 中等")
+        performanceLabel.frame = NSRect(x: 10, y: 50, width: 200, height: 20)
+        
+        let qualityLabel = NSTextField(labelWithString: "显示质量: 标准")
+        qualityLabel.frame = NSRect(x: 10, y: 20, width: 200, height: 20)
+        
+        view.addSubview(bandwidthLabel)
+        view.addSubview(performanceLabel)
+        view.addSubview(qualityLabel)
+        
+        return view
+    }
+}
+
+// 配置应用和集成
+extension RemoteDesktopIntegrator {
+    func launchRemoteDesktopWithQualityConfig(connectionInfo: RDPConnectionInfo) throws {
+        // 获取当前质量配置
+        let configManager = QualityConfigurationManager()
+        let currentProfile = configManager.getCurrentProfile()
+        let qualitySettings = configManager.getQualitySettings(for: currentProfile)
+        
+        // 检测显示器配置
+        let displayDetector = DisplayDetector()
+        let primaryDisplay = displayDetector.detectPrimaryDisplay()
+        
+        // 合并质量配置和显示器优化
+        let optimizedSettings = mergeQualityAndDisplaySettings(
+            qualitySettings: qualitySettings,
+            displayConfig: primaryDisplay
+        )
+        
+        // 生成最终RDP配置
+        let rdpContent = generateOptimizedRDPConfig(
+            settings: optimizedSettings,
+            connectionInfo: connectionInfo
+        )
+        
+        let tempURL = createTemporaryRDPFile(content: rdpContent)
+        
+        // 启动Microsoft Remote Desktop
+        let workspace = NSWorkspace.shared
+        try workspace.open(tempURL, withApplication: "Microsoft Remote Desktop")
+    }
+    
+    private func mergeQualityAndDisplaySettings(
+        qualitySettings: RDPQualitySettings,
+        displayConfig: DisplayConfiguration
+    ) -> RDPDisplaySettings {
+        // 将用户质量偏好与显示器优化相结合
+        return RDPDisplaySettings(
+            desktopWidth: min(displayConfig.width, 3840),
+            desktopHeight: min(displayConfig.height, 2160),
+            sessionBpp: qualitySettings.colorDepth,
+            desktopScaleFactor: Int(displayConfig.scaleFactor * 100),
+            smartSizing: true,
+            compression: qualitySettings.compressionLevel,
+            bitmapCachePersistEnable: qualitySettings.bitmapCaching,
+            disableWallpaper: !qualitySettings.enableWallpaper,
+            allowFontSmoothing: qualitySettings.enableFontSmoothing && displayConfig.isRetina,
+            screenModeId: 2
+        )
+    }
+}
+```
+
+### 菜单栏集成 🆕
+在应用程序菜单栏中添加质量配置入口：
+
+```swift
+extension AppDelegate {
+    func setupMenuBar() {
+        let mainMenu = NSMenu()
+        
+        // 应用程序菜单
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        
+        // 添加质量配置菜单项
+        let configMenuItem = NSMenuItem(
+            title: "RDP质量配置...",
+            action: #selector(showQualityConfiguration),
+            keyEquivalent: ","
+        )
+        configMenuItem.keyEquivalentModifierMask = .command
+        appMenu.addItem(configMenuItem)
+        
+        appMenu.addItem(NSMenuItem.separator())
+        
+        // 快速切换质量配置子菜单
+        let quickSwitchMenuItem = NSMenuItem(title: "快速切换质量", action: nil, keyEquivalent: "")
+        let quickSwitchMenu = NSMenu()
+        
+        quickSwitchMenu.addItem(NSMenuItem(
+            title: "性能优先",
+            action: #selector(switchToPerformanceMode),
+            keyEquivalent: "1"
+        ))
+        quickSwitchMenu.addItem(NSMenuItem(
+            title: "平衡模式",
+            action: #selector(switchToBalancedMode),
+            keyEquivalent: "2"
+        ))
+        quickSwitchMenu.addItem(NSMenuItem(
+            title: "质量优先",
+            action: #selector(switchToQualityMode),
+            keyEquivalent: "3"
+        ))
+        
+        quickSwitchMenuItem.submenu = quickSwitchMenu
+        appMenu.addItem(quickSwitchMenuItem)
+        
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+        
+        NSApplication.shared.mainMenu = mainMenu
+    }
+    
+    @objc func showQualityConfiguration() {
+        let configController = ConfigurationWindowController()
+        configController.showWindow(nil)
+    }
+    
+    @objc func switchToPerformanceMode() {
+        let configManager = QualityConfigurationManager()
+        configManager.setCurrentProfile(.performance)
+        showNotification("已切换到性能优先模式")
+    }
+    
+    @objc func switchToBalancedMode() {
+        let configManager = QualityConfigurationManager()
+        configManager.setCurrentProfile(.balanced)
+        showNotification("已切换到平衡模式")
+    }
+    
+    @objc func switchToQualityMode() {
+        let configManager = QualityConfigurationManager()
+        configManager.setCurrentProfile(.quality)
+        showNotification("已切换到质量优先模式")
+    }
+    
+    private func showNotification(_ message: String) {
+        let notification = NSUserNotification()
+        notification.title = "JMS Protocol Handler"
+        notification.informativeText = message
+        NSUserNotificationCenter.default.deliver(notification)
+    }
 }
 ```
