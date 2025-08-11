@@ -3,8 +3,16 @@ import Cocoa
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
     
+    // MARK: - Properties
+    
+    private let qualityConfigManager = RDPQualityConfigManager.shared
+    private let remoteDesktopIntegrator = RemoteDesktopIntegrator()
+    
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         print("JMS Protocol Handler started - 支持RDP和SSH协议")
+        
+        // 设置应用程序菜单
+        setupApplicationMenu()
         
         // 显示启动成功通知
         showNotification("JMS Protocol Handler 已启动，准备处理RDP和SSH连接请求")
@@ -334,6 +342,209 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let error = error {
             print("AppleScript执行错误: \(error)")
             throw NSError(domain: "JMSError", code: 16, userInfo: [NSLocalizedDescriptionKey: "终端启动失败"])
+        }
+    }
+    
+    // MARK: - Menu Setup
+    
+    /// 设置应用程序菜单
+    private func setupApplicationMenu() {
+        let mainMenu = NSMenu()
+        
+        // 应用程序菜单
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        
+        // 应用程序名称菜单项
+        let appNameMenuItem = NSMenuItem(title: "JMS Protocol Handler", action: nil, keyEquivalent: "")
+        appMenu.addItem(appNameMenuItem)
+        appMenu.addItem(NSMenuItem.separator())
+        
+        // RDP质量配置菜单项
+        let configMenuItem = NSMenuItem(
+            title: "RDP质量配置...",
+            action: #selector(showQualityConfiguration),
+            keyEquivalent: ","
+        )
+        configMenuItem.keyEquivalentModifierMask = .command
+        appMenu.addItem(configMenuItem)
+        
+        appMenu.addItem(NSMenuItem.separator())
+        
+        // 快速切换质量配置子菜单
+        let quickSwitchMenuItem = NSMenuItem(title: "快速切换质量", action: nil, keyEquivalent: "")
+        let quickSwitchMenu = NSMenu()
+        
+        let performanceMenuItem = NSMenuItem(
+            title: "性能优先 (适合低带宽)",
+            action: #selector(switchToPerformanceMode),
+            keyEquivalent: "1"
+        )
+        performanceMenuItem.keyEquivalentModifierMask = .command
+        quickSwitchMenu.addItem(performanceMenuItem)
+        
+        let balancedMenuItem = NSMenuItem(
+            title: "平衡模式 (推荐)",
+            action: #selector(switchToBalancedMode),
+            keyEquivalent: "2"
+        )
+        balancedMenuItem.keyEquivalentModifierMask = .command
+        quickSwitchMenu.addItem(balancedMenuItem)
+        
+        let qualityMenuItem = NSMenuItem(
+            title: "质量优先 (适合局域网)",
+            action: #selector(switchToQualityMode),
+            keyEquivalent: "3"
+        )
+        qualityMenuItem.keyEquivalentModifierMask = .command
+        quickSwitchMenu.addItem(qualityMenuItem)
+        
+        quickSwitchMenu.addItem(NSMenuItem.separator())
+        
+        // 当前配置状态显示
+        let currentConfigMenuItem = NSMenuItem(
+            title: getCurrentConfigurationStatus(),
+            action: nil,
+            keyEquivalent: ""
+        )
+        currentConfigMenuItem.isEnabled = false
+        quickSwitchMenu.addItem(currentConfigMenuItem)
+        
+        quickSwitchMenuItem.submenu = quickSwitchMenu
+        appMenu.addItem(quickSwitchMenuItem)
+        
+        appMenu.addItem(NSMenuItem.separator())
+        
+        // 关于菜单项
+        let aboutMenuItem = NSMenuItem(
+            title: "关于 JMS Protocol Handler",
+            action: #selector(showAbout),
+            keyEquivalent: ""
+        )
+        appMenu.addItem(aboutMenuItem)
+        
+        appMenu.addItem(NSMenuItem.separator())
+        
+        // 退出菜单项
+        let quitMenuItem = NSMenuItem(
+            title: "退出 JMS Protocol Handler",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        quitMenuItem.keyEquivalentModifierMask = .command
+        appMenu.addItem(quitMenuItem)
+        
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+        
+        // 设置主菜单
+        NSApplication.shared.mainMenu = mainMenu
+        
+        // 监听配置变更通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(qualityConfigurationDidChange(_:)),
+            name: RDPQualityConfigManager.configurationDidChangeNotification,
+            object: nil
+        )
+    }
+    
+    /// 获取当前配置状态描述
+    private func getCurrentConfigurationStatus() -> String {
+        let currentProfile = qualityConfigManager.getCurrentQualityProfile()
+        let analysis = remoteDesktopIntegrator.getCurrentQualityAnalysis()
+        
+        return "当前配置: \(currentProfile.displayName) (\(analysis.recommendedBandwidth))"
+    }
+    
+    /// 更新菜单中的配置状态显示
+    private func updateConfigurationStatusInMenu() {
+        guard let mainMenu = NSApplication.shared.mainMenu,
+              let appMenuItem = mainMenu.items.first,
+              let appMenu = appMenuItem.submenu,
+              let quickSwitchMenuItem = appMenu.items.first(where: { $0.title == "快速切换质量" }),
+              let quickSwitchMenu = quickSwitchMenuItem.submenu else {
+            return
+        }
+        
+        // 找到状态显示菜单项并更新
+        for menuItem in quickSwitchMenu.items {
+            if menuItem.title.hasPrefix("当前配置:") {
+                menuItem.title = getCurrentConfigurationStatus()
+                break
+            }
+        }
+    }
+    
+    // MARK: - Menu Actions
+    
+    @objc private func showQualityConfiguration() {
+        let configViewController = RDPQualityConfigViewController()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "RDP质量配置"
+        window.contentViewController = configViewController
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        
+        // 确保窗口在前台
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc private func switchToPerformanceMode() {
+        remoteDesktopIntegrator.switchQualityProfile(.performance)
+        showNotification("已切换到性能优先模式 - 适合低带宽网络环境")
+        updateConfigurationStatusInMenu()
+    }
+    
+    @objc private func switchToBalancedMode() {
+        remoteDesktopIntegrator.switchQualityProfile(.balanced)
+        showNotification("已切换到平衡模式 - 性能与质量的最佳平衡")
+        updateConfigurationStatusInMenu()
+    }
+    
+    @objc private func switchToQualityMode() {
+        remoteDesktopIntegrator.switchQualityProfile(.quality)
+        showNotification("已切换到质量优先模式 - 适合高带宽局域网环境")
+        updateConfigurationStatusInMenu()
+    }
+    
+    @objc private func showAbout() {
+        let alert = NSAlert()
+        alert.messageText = "JMS Protocol Handler v1.2.0"
+        alert.informativeText = """
+        一个用于处理 jms:// 协议链接的 macOS 应用程序
+        
+        功能特性:
+        • RDP协议支持 (含智能显示优化)
+        • SSH协议支持 (自动密码输入)
+        • 质量配置管理 (性能/平衡/质量)
+        • HiDPI显示器优化
+        • 多显示器支持
+        
+        系统要求: macOS 10.15+
+        架构支持: Apple Silicon (ARM64) + Intel (x86_64)
+        
+        © 2025 JMS Protocol Handler
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
+    }
+    
+    @objc private func qualityConfigurationDidChange(_ notification: Notification) {
+        // 更新菜单状态显示
+        updateConfigurationStatusInMenu()
+        
+        // 如果有配置文件信息，显示通知
+        if let profile = notification.userInfo?["profile"] as? DisplayQualityProfile {
+            let analysis = remoteDesktopIntegrator.getCurrentQualityAnalysis()
+            showNotification("配置已更新: \(profile.displayName) (\(analysis.recommendedBandwidth))")
         }
     }
     
