@@ -17,6 +17,13 @@ enum JMSError: LocalizedError {
     case expectToolNotFound
     case terminalLaunchFailed
     
+    // 显示相关错误
+    case displayDetectionFailed
+    case unsupportedDisplayConfiguration
+    case rdpConfigGenerationFailed
+    case invalidDisplayParameters
+    case hiDPIConfigurationFailed
+    
     var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -47,6 +54,16 @@ enum JMSError: LocalizedError {
             return "未找到expect工具"
         case .terminalLaunchFailed:
             return "启动终端应用程序失败"
+        case .displayDetectionFailed:
+            return "显示器检测失败"
+        case .unsupportedDisplayConfiguration:
+            return "不支持的显示器配置"
+        case .rdpConfigGenerationFailed:
+            return "RDP配置生成失败"
+        case .invalidDisplayParameters:
+            return "无效的显示参数"
+        case .hiDPIConfigurationFailed:
+            return "HiDPI配置失败"
         }
     }
     
@@ -80,6 +97,16 @@ enum JMSError: LocalizedError {
             return "系统中未安装expect工具，无法自动输入密码"
         case .terminalLaunchFailed:
             return "无法启动终端应用程序或执行AppleScript"
+        case .displayDetectionFailed:
+            return "无法检测到系统显示器配置信息"
+        case .unsupportedDisplayConfiguration:
+            return "当前显示器配置不被支持或无法处理"
+        case .rdpConfigGenerationFailed:
+            return "无法生成优化的RDP配置文件"
+        case .invalidDisplayParameters:
+            return "显示器参数无效或超出支持范围"
+        case .hiDPIConfigurationFailed:
+            return "无法为HiDPI显示器生成正确的配置"
         }
     }
     
@@ -113,6 +140,16 @@ enum JMSError: LocalizedError {
             return "请安装expect工具：brew install expect，或手动输入SSH密码"
         case .terminalLaunchFailed:
             return "请检查终端应用程序权限设置，确保允许AppleScript控制"
+        case .displayDetectionFailed:
+            return "请检查显示器连接状态，确保至少有一个显示器正常工作"
+        case .unsupportedDisplayConfiguration:
+            return "请尝试使用标准的显示器分辨率和缩放设置"
+        case .rdpConfigGenerationFailed:
+            return "请检查显示器配置是否正常，或使用默认RDP设置"
+        case .invalidDisplayParameters:
+            return "请检查显示器设置，确保分辨率和缩放比例在合理范围内"
+        case .hiDPIConfigurationFailed:
+            return "请检查HiDPI显示器设置，或尝试调整系统显示缩放比例"
         }
     }
 }
