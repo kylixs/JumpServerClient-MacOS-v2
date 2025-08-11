@@ -61,7 +61,7 @@
   - 编写RDP配置优化的单元测试
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 9. 更新Remote Desktop集成器支持显示优化
+- [x] 9. 更新Remote Desktop集成器支持显示优化
   - 更新RemoteDesktopIntegrator集成DisplayDetector和RDPConfigOptimizer
   - 实现启动前的显示器检测和配置优化流程
   - 生成包含显示优化参数的RDP配置文件
@@ -79,7 +79,7 @@
   - 编写SSH终端集成的单元测试和集成测试
   - _Requirements: 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-- [ ] 11. 更新主应用程序控制器集成显示优化模块
+- [x] 11. 更新主应用程序控制器集成显示优化模块
   - 更新AppDelegate集成DisplayDetector和RDPConfigOptimizer
   - 在RDP连接建立前执行显示器检测和配置优化
   - 集成显示相关的错误处理和用户通知
