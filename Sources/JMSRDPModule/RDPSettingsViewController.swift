@@ -354,8 +354,12 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateDisplayInfo(_ config: DisplayConfiguration) {
-        let hiDPIStatus = config.isHiDPI ? "HiDPI" : "标准"
-        displayInfoLabel.stringValue = "当前显示器: \(config.width)×\(config.height) (\(hiDPIStatus), 缩放: \(Int(config.scaleFactor * 100))%)"
+        let hiDPIStatus = config.isHiDPI ? "HiDPI" : "标准DPI"
+        let scaleInfo = config.scaleFactor > 1.0 ? " (缩放: \(String(format: "%.1f", config.scaleFactor))x)" : ""
+        
+        displayInfoLabel.stringValue = "当前显示器: \(config.width)×\(config.height) \(hiDPIStatus)\(scaleInfo)"
+        
+        print("🖥️ 显示器信息更新 - 物理分辨率: \(config.width)×\(config.height), HiDPI: \(config.isHiDPI), 缩放: \(config.scaleFactor)")
         
         // 如果启用自动检测，更新UI
         if autoDetectionCheckbox.state == .on {

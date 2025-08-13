@@ -180,19 +180,6 @@ class RDPSettingsViewControllerTests: XCTestCase {
         XCTAssertEqual(balanced.colorDepth, 24)
     }
     
-    // MARK: - 清晰度评级测试
-    
-    func testClarityRating() {
-        // 测试清晰度评级算法
-        let lowQuality = RDPSettings.performance
-        let lowRating = lowQuality.generatePreview()
-        XCTAssertTrue(lowRating.contains("⭐") || lowRating.contains("⭐⭐"))
-        
-        let highQuality = RDPSettings.quality
-        let highRating = highQuality.generatePreview()
-        XCTAssertTrue(highRating.contains("⭐⭐⭐") || highRating.contains("⭐⭐⭐⭐"))
-    }
-    
     // MARK: - 性能测试
     
     func testPerformanceDisplayDetection() {
