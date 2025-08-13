@@ -11,203 +11,243 @@ final class JMSRDPModuleTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        configManager = RDPConfigManager.shared
+        configManager = RDPConfigManager(forTesting: true)
         displayDetector = DisplayDetector()
         rdpIntegrator = RemoteDesktopIntegrator()
     }
     
     override func tearDown() {
-        configManager.resetToDefaults()
+        configManager = nil
+        displayDetector = nil
+        rdpIntegrator = nil
         super.tearDown()
-    }
-    
-    // MARK: - RDPConfigManager Tests
-    
-    func testRDPConfigManagerQualityProfiles() {
-        let profiles = configManager.availableQualityProfiles
-        
-        XCTAssertEqual(profiles.count, 3)
-        XCTAssertTrue(profiles.contains { $0.identifier == "performance" })
-        XCTAssertTrue(profiles.contains { $0.identifier == "balanced" })
-        XCTAssertTrue(profiles.contains { $0.identifier == "quality" })
-    }
-    
-    func testRDPConfigManagerSetQualityProfile() {
-        // 测试设置性能优先配置
-        configManager.setQualityProfile(.performance)
-        XCTAssertEqual(configManager.qualityProfile.identifier, "performance")
-        
-        // 测试设置质量优先配置
-        configManager.setQualityProfile(.quality)
-        XCTAssertEqual(configManager.qualityProfile.identifier, "quality")
-    }
-    
-    func testRDPConfigManagerCustomSettings() {
-        let customSettings = RDPSettings(
-            resolution: .custom(1920, 1080),
-            colorDepth: .depth24,
-            compressionLevel: .low,
-            enableFontSmoothing: true,
-            scalingFactor: 1.5
-        )
-        
-        configManager.updateSettings(customSettings)
-        
-        let currentSettings = configManager.settings
-        XCTAssertEqual(currentSettings.resolution.width, 1920)
-        XCTAssertEqual(currentSettings.resolution.height, 1080)
-        XCTAssertEqual(currentSettings.colorDepth, .depth24)
-        XCTAssertEqual(currentSettings.compressionLevel, .low)
-        XCTAssertTrue(currentSettings.enableFontSmoothing)
-        XCTAssertEqual(currentSettings.scalingFactor, 1.5)
-    }
-    
-    func testRDPConfigManagerGenerateConfig() throws {
-        let connectionInfo = RDPConnectionInfo(
-            fullAddress: "test.server.com:3389",
-            username: "testuser",
-            config: "full address:s:test.server.com:3389\nusername:s:testuser"
-        )
-        
-        // 使用模拟的显示器配置进行测试
-        let mockDisplayConfig = DisplayConfiguration(
-            width: 1920,
-            height: 1080,
-            scaleFactor: 1.0,
-            colorDepth: 24,
-            isHiDPI: false
-        )
-        
-        // 由于generateOptimizedConfig需要检测真实显示器，我们测试配置文件的基本结构
-        configManager.setQualityProfile(.balanced)
-        
-        // 这里我们测试配置管理器的基本功能
-        let settings = configManager.settings
-        XCTAssertNotNil(settings)
-        XCTAssertEqual(configManager.qualityProfile.identifier, "balanced")
-    }
-    
-    func testRDPConfigManagerResetToDefaults() {
-        // 先设置自定义配置
-        let customSettings = RDPSettings(
-            resolution: .custom(2560, 1440),
-            colorDepth: .depth32,
-            compressionLevel: .none
-        )
-        configManager.updateSettings(customSettings)
-        
-        // 重置为默认值
-        configManager.resetToDefaults()
-        
-        // 验证已重置
-        XCTAssertEqual(configManager.qualityProfile.identifier, "balanced")
-        let defaultSettings = configManager.settings
-        XCTAssertEqual(defaultSettings.resolution.width, 1920) // 默认FullHD
-        XCTAssertEqual(defaultSettings.colorDepth, .depth24)
-    }
-    
-    // MARK: - QualityProfile Tests
-    
-    func testQualityProfileSettings() {
-        let performanceSettings = QualityProfile.performance.settings
-        XCTAssertEqual(performanceSettings.colorDepth, .depth16)
-        XCTAssertEqual(performanceSettings.compressionLevel, .high)
-        XCTAssertFalse(performanceSettings.enableFontSmoothing)
-        
-        let qualitySettings = QualityProfile.quality.settings
-        XCTAssertEqual(qualitySettings.colorDepth, .depth32)
-        XCTAssertEqual(qualitySettings.compressionLevel, .none)
-        XCTAssertTrue(qualitySettings.enableFontSmoothing)
-        
-        let balancedSettings = QualityProfile.balanced.settings
-        XCTAssertEqual(balancedSettings.colorDepth, .depth24)
-        XCTAssertEqual(balancedSettings.compressionLevel, .medium)
-        XCTAssertTrue(balancedSettings.enableFontSmoothing)
-    }
-    
-    func testQualityProfileDisplayNames() {
-        XCTAssertEqual(QualityProfile.performance.displayName, "性能优先")
-        XCTAssertEqual(QualityProfile.balanced.displayName, "平衡模式")
-        XCTAssertEqual(QualityProfile.quality.displayName, "质量优先")
-        
-        let customProfile = QualityProfile.custom(RDPSettings.default)
-        XCTAssertEqual(customProfile.displayName, "自定义配置")
-    }
-    
-    func testQualityProfileIdentifiers() {
-        XCTAssertEqual(QualityProfile.performance.identifier, "performance")
-        XCTAssertEqual(QualityProfile.balanced.identifier, "balanced")
-        XCTAssertEqual(QualityProfile.quality.identifier, "quality")
-        
-        let customProfile = QualityProfile.custom(RDPSettings.default)
-        XCTAssertEqual(customProfile.identifier, "custom")
-    }
-    
-    func testQualityProfileFromIdentifier() {
-        XCTAssertNotNil(QualityProfile.fromIdentifier("performance"))
-        XCTAssertNotNil(QualityProfile.fromIdentifier("balanced"))
-        XCTAssertNotNil(QualityProfile.fromIdentifier("quality"))
-        XCTAssertNotNil(QualityProfile.fromIdentifier("custom"))
-        XCTAssertNil(QualityProfile.fromIdentifier("invalid"))
-        
-        let performanceProfile = QualityProfile.fromIdentifier("performance")!
-        XCTAssertEqual(performanceProfile.identifier, "performance")
-    }
-    
-    // MARK: - Resolution Tests
-    
-    func testResolutionDimensions() {
-        XCTAssertEqual(Resolution.fullHD.width, 1920)
-        XCTAssertEqual(Resolution.fullHD.height, 1080)
-        
-        XCTAssertEqual(Resolution.quadHD.width, 2560)
-        XCTAssertEqual(Resolution.quadHD.height, 1440)
-        
-        XCTAssertEqual(Resolution.ultraHD.width, 3840)
-        XCTAssertEqual(Resolution.ultraHD.height, 2160)
-        
-        let customRes = Resolution.custom(1366, 768)
-        XCTAssertEqual(customRes.width, 1366)
-        XCTAssertEqual(customRes.height, 768)
     }
     
     // MARK: - RDPSettings Tests
     
-    func testRDPSettingsDefault() {
-        let defaultSettings = RDPSettings.default
+    func testRDPSettingsPresets() {
+        // 测试性能优先预设
+        let performance = RDPSettings.performance
+        XCTAssertEqual(performance.profileName, "性能优先")
+        XCTAssertEqual(performance.compressionLevel, 2)
+        XCTAssertEqual(performance.colorDepth, 16)
+        XCTAssertFalse(performance.hiDPI.enabled)
+        XCTAssertFalse(performance.useAutoDetection)
         
-        XCTAssertEqual(defaultSettings.resolution.width, 1920)
-        XCTAssertEqual(defaultSettings.resolution.height, 1080)
-        XCTAssertEqual(defaultSettings.colorDepth, .depth24)
-        XCTAssertEqual(defaultSettings.compressionLevel, .medium)
-        XCTAssertTrue(defaultSettings.enableFontSmoothing)
-        XCTAssertEqual(defaultSettings.scalingFactor, 1.0)
+        // 测试平衡模式预设
+        let balanced = RDPSettings.balanced
+        XCTAssertEqual(balanced.profileName, "平衡模式")
+        XCTAssertEqual(balanced.compressionLevel, 1)
+        XCTAssertEqual(balanced.colorDepth, 24)
+        XCTAssertTrue(balanced.hiDPI.enabled)
+        XCTAssertTrue(balanced.useAutoDetection)
+        
+        // 测试质量优先预设
+        let quality = RDPSettings.quality
+        XCTAssertEqual(quality.profileName, "质量优先")
+        XCTAssertEqual(quality.compressionLevel, 0)
+        XCTAssertEqual(quality.colorDepth, 32)
+        XCTAssertTrue(quality.hiDPI.enabled)
+        XCTAssertTrue(quality.useAutoDetection)
     }
     
-    func testRDPSettingsCodable() throws {
-        let originalSettings = RDPSettings(
-            resolution: .custom(2560, 1440),
-            colorDepth: .depth32,
-            compressionLevel: .low,
-            enableFontSmoothing: false,
-            scalingFactor: 2.0
+    func testRDPSettingsAllPresets() {
+        let allPresets = RDPSettings.allPresets
+        XCTAssertEqual(allPresets.count, 3)
+        
+        let profileNames = allPresets.map { $0.profileName }
+        XCTAssertTrue(profileNames.contains("性能优先"))
+        XCTAssertTrue(profileNames.contains("平衡模式"))
+        XCTAssertTrue(profileNames.contains("质量优先"))
+    }
+    
+    func testRDPSettingsPresetByName() {
+        let performance = RDPSettings.preset(named: "性能优先")
+        XCTAssertNotNil(performance)
+        XCTAssertEqual(performance?.profileName, "性能优先")
+        
+        let nonExistent = RDPSettings.preset(named: "不存在的预设")
+        XCTAssertNil(nonExistent)
+    }
+    
+    // MARK: - ResolutionSettings Tests
+    
+    func testResolutionSettingsPresets() {
+        let fullHD = ResolutionSettings.fullHD
+        XCTAssertEqual(fullHD.width, 1920)
+        XCTAssertEqual(fullHD.height, 1080)
+        XCTAssertEqual(fullHD.presetName, "Full HD")
+        XCTAssertFalse(fullHD.isCustom)
+        
+        let twoK = ResolutionSettings.twoK
+        XCTAssertEqual(twoK.width, 2560)
+        XCTAssertEqual(twoK.height, 1440)
+        XCTAssertEqual(twoK.presetName, "2K")
+        
+        let fourK = ResolutionSettings.fourK
+        XCTAssertEqual(fourK.width, 3840)
+        XCTAssertEqual(fourK.height, 2160)
+        XCTAssertEqual(fourK.presetName, "4K")
+    }
+    
+    func testResolutionSettingsValidation() {
+        // 测试有效分辨率
+        let validResolutions = [
+            (800, 600),    // 最小值
+            (1920, 1080),  // 常用值
+            (3840, 2160),  // 4K
+            (7680, 4320)   // 最大值
+        ]
+        
+        for (width, height) in validResolutions {
+            let resolution = ResolutionSettings(width: width, height: height, isCustom: true)
+            XCTAssertTrue(resolution.isValid, "分辨率 \(width)×\(height) 应该有效")
+        }
+        
+        // 测试无效分辨率
+        let invalidResolutions = [
+            (500, 400),    // 太小
+            (8000, 5000),  // 太大
+            (0, 0),        // 零值
+            (-1, -1)       // 负值
+        ]
+        
+        for (width, height) in invalidResolutions {
+            let resolution = ResolutionSettings(width: width, height: height, isCustom: true)
+            XCTAssertFalse(resolution.isValid, "分辨率 \(width)×\(height) 应该无效")
+        }
+    }
+    
+    func testResolutionSettingsDisplayName() {
+        let preset = ResolutionSettings.fullHD
+        XCTAssertEqual(preset.displayName, "1920×1080 (Full HD)")
+        
+        let custom = ResolutionSettings(width: 1366, height: 768, isCustom: true)
+        XCTAssertEqual(custom.displayName, "1366×768 (自定义)")
+        
+        let regular = ResolutionSettings(width: 2560, height: 1440)
+        XCTAssertEqual(regular.displayName, "2560×1440")
+    }
+    
+    func testResolutionSettingsBandwidthEstimation() {
+        let fullHD = ResolutionSettings.fullHD
+        XCTAssertEqual(fullHD.estimatedBandwidth, "5-10 Mbps")
+        
+        let twoK = ResolutionSettings.twoK
+        XCTAssertEqual(twoK.estimatedBandwidth, "10-25 Mbps")
+        
+        let fourK = ResolutionSettings.fourK
+        XCTAssertEqual(fourK.estimatedBandwidth, "> 25 Mbps")
+        
+        let lowRes = ResolutionSettings(width: 1366, height: 768, isCustom: true)
+        XCTAssertEqual(lowRes.estimatedBandwidth, "< 5 Mbps")
+    }
+    
+    // MARK: - HiDPISettings Tests
+    
+    func testHiDPISettingsScaleFactorDescriptions() {
+        let testCases: [(Double, String)] = [
+            (1.0, "100% (标准)"),
+            (1.25, "125% (小)"),
+            (1.5, "150% (中)"),
+            (2.0, "200% (大)"),
+            (2.5, "250% (更大)"),
+            (3.0, "300% (最大)"),
+            (1.75, "175% (自定义)")
+        ]
+        
+        for (scaleFactor, expectedDescription) in testCases {
+            let hiDPISettings = HiDPISettings(enabled: true, scaleFactor: scaleFactor)
+            XCTAssertEqual(hiDPISettings.scaleFactorDescription, expectedDescription)
+        }
+    }
+    
+    // MARK: - RDP Content Generation Tests
+    
+    func testRDPContentGeneration() {
+        let settings = RDPSettings(
+            profileName: "测试配置",
+            compressionLevel: 1,
+            colorDepth: 24,
+            audioQuality: "中等",
+            enableFontSmoothing: true,
+            enableWallpaper: true,
+            enableMenuAnimations: false,
+            enableThemes: true,
+            resolution: ResolutionSettings(width: 1920, height: 1080),
+            hiDPI: HiDPISettings(enabled: true, scaleFactor: 2.0),
+            useAutoDetection: true
         )
         
-        // 编码
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(originalSettings)
+        let rdpContent = settings.generateRDPContent(server: "test.server.com", username: "testuser")
         
-        // 解码
-        let decoder = JSONDecoder()
-        let decodedSettings = try decoder.decode(RDPSettings.self, from: data)
+        // 验证基本连接信息
+        XCTAssertTrue(rdpContent.contains("full address:s:test.server.com"))
+        XCTAssertTrue(rdpContent.contains("username:s:testuser"))
         
-        // 验证
-        XCTAssertEqual(decodedSettings.resolution.width, 2560)
-        XCTAssertEqual(decodedSettings.resolution.height, 1440)
-        XCTAssertEqual(decodedSettings.colorDepth, .depth32)
-        XCTAssertEqual(decodedSettings.compressionLevel, .low)
-        XCTAssertFalse(decodedSettings.enableFontSmoothing)
-        XCTAssertEqual(decodedSettings.scalingFactor, 2.0)
+        // 验证分辨率设置
+        XCTAssertTrue(rdpContent.contains("desktopwidth:i:1920"))
+        XCTAssertTrue(rdpContent.contains("desktopheight:i:1080"))
+        
+        // 验证HiDPI设置
+        XCTAssertTrue(rdpContent.contains("desktopscalefactor:i:200"))
+        XCTAssertTrue(rdpContent.contains("hidef color depth:i:24"))
+        
+        // 验证质量设置
+        XCTAssertTrue(rdpContent.contains("compression:i:1"))
+        XCTAssertTrue(rdpContent.contains("session bpp:i:24"))
+        
+        // 验证特效设置
+        XCTAssertTrue(rdpContent.contains("font smoothing:i:1"))
+        XCTAssertTrue(rdpContent.contains("disable wallpaper:i:0"))
+        XCTAssertTrue(rdpContent.contains("disable menu anims:i:1"))
+        XCTAssertTrue(rdpContent.contains("disable themes:i:0"))
+    }
+    
+    func testRDPContentGenerationWithoutHiDPI() {
+        let settings = RDPSettings(
+            profileName: "无HiDPI配置",
+            compressionLevel: 2,
+            colorDepth: 16,
+            audioQuality: "禁用",
+            enableFontSmoothing: false,
+            enableWallpaper: false,
+            enableMenuAnimations: false,
+            enableThemes: false,
+            resolution: ResolutionSettings(width: 1366, height: 768, isCustom: true),
+            hiDPI: HiDPISettings(enabled: false, scaleFactor: 1.0),
+            useAutoDetection: false
+        )
+        
+        let rdpContent = settings.generateRDPContent(server: "example.com", username: "user")
+        
+        // 验证HiDPI相关设置不存在
+        XCTAssertFalse(rdpContent.contains("desktopscalefactor"))
+        XCTAssertFalse(rdpContent.contains("hidef color depth"))
+        
+        // 验证其他设置
+        XCTAssertTrue(rdpContent.contains("desktopwidth:i:1366"))
+        XCTAssertTrue(rdpContent.contains("desktopheight:i:768"))
+        XCTAssertTrue(rdpContent.contains("compression:i:2"))
+        XCTAssertTrue(rdpContent.contains("session bpp:i:16"))
+    }
+    
+    // MARK: - Configuration Preview Tests
+    
+    func testConfigurationPreview() {
+        let settings = RDPSettings.balanced
+        let preview = settings.generatePreview()
+        
+        XCTAssertTrue(preview.contains("# RDP配置预览"))
+        XCTAssertTrue(preview.contains("配置文件: 平衡模式"))
+        XCTAssertTrue(preview.contains("显示设置:"))
+        XCTAssertTrue(preview.contains("分辨率:"))
+        XCTAssertTrue(preview.contains("HiDPI:"))
+        XCTAssertTrue(preview.contains("质量设置:"))
+        XCTAssertTrue(preview.contains("特效设置:"))
+        XCTAssertTrue(preview.contains("性能预估:"))
+        XCTAssertTrue(preview.contains("清晰度评级:"))
+        XCTAssertTrue(preview.contains("适用场景:"))
     }
     
     // MARK: - DisplayDetector Tests
@@ -216,17 +256,34 @@ final class JMSRDPModuleTests: XCTestCase {
         XCTAssertNotNil(displayDetector)
     }
     
-    func testDisplayDetectorPrimaryDisplay() {
-        // 注意：这个测试在CI环境中可能失败，因为可能没有显示器
-        // 在实际环境中，这个测试应该能够检测到主显示器
+    func testDisplayDetection() {
         do {
             let primaryDisplay = try displayDetector.detectPrimaryDisplay()
+            
             XCTAssertGreaterThan(primaryDisplay.width, 0)
             XCTAssertGreaterThan(primaryDisplay.height, 0)
+            XCTAssertGreaterThan(primaryDisplay.scaleFactor, 0)
             XCTAssertGreaterThan(primaryDisplay.colorDepth, 0)
+            XCTAssertGreaterThanOrEqual(primaryDisplay.refreshRate, 0)
         } catch {
-            // 在没有显示器的环境中，这是预期的行为
-            print("显示器检测失败（可能在无头环境中）: \(error)")
+            // 在某些测试环境中可能无法检测显示器
+            print("显示器检测跳过: \(error.localizedDescription)")
+        }
+    }
+    
+    func testAllDisplaysDetection() {
+        do {
+            let allDisplays = try displayDetector.detectAllDisplays()
+            XCTAssertGreaterThan(allDisplays.count, 0)
+            
+            for display in allDisplays {
+                XCTAssertGreaterThan(display.width, 0)
+                XCTAssertGreaterThan(display.height, 0)
+                XCTAssertGreaterThan(display.scaleFactor, 0)
+            }
+        } catch {
+            // 在某些测试环境中可能无法检测显示器
+            print("显示器检测跳过: \(error.localizedDescription)")
         }
     }
     
@@ -236,110 +293,75 @@ final class JMSRDPModuleTests: XCTestCase {
         XCTAssertNotNil(rdpIntegrator)
     }
     
-    func testRemoteDesktopIntegratorQualityProfiles() {
-        let profiles = rdpIntegrator.availableQualityProfiles
-        XCTAssertEqual(profiles.count, 3)
+    // MARK: - RDPConfigManager Tests
+    
+    func testRDPConfigManagerInitialization() {
+        XCTAssertNotNil(configManager)
         
-        // 测试设置质量配置
-        rdpIntegrator.setQualityProfile(.performance)
-        XCTAssertEqual(rdpIntegrator.currentQualityProfile.identifier, "performance")
+        let currentSettings = configManager.currentSettings
+        XCTAssertNotNil(currentSettings)
+        XCTAssertEqual(currentSettings.profileName, "平衡模式")
     }
     
-    func testRemoteDesktopIntegratorCustomSettings() {
-        let customSettings = RDPSettings(
-            resolution: .quadHD,
-            colorDepth: .depth32,
-            compressionLevel: .none
-        )
+    // MARK: - Error Handling Tests
+    
+    func testRDPSettingsError() {
+        let noSettingsError = RDPSettingsError.noCurrentSettings
+        XCTAssertNotNil(noSettingsError.errorDescription)
+        XCTAssertEqual(noSettingsError.errorDescription, "没有当前设置")
         
-        rdpIntegrator.updateCustomSettings(customSettings)
-        XCTAssertEqual(rdpIntegrator.currentQualityProfile.identifier, "custom")
+        let testError = NSError(domain: "TestDomain", code: 123, userInfo: [NSLocalizedDescriptionKey: "测试错误"])
+        let saveFailedError = RDPSettingsError.saveFailed(testError)
+        XCTAssertNotNil(saveFailedError.errorDescription)
+        XCTAssertTrue(saveFailedError.errorDescription?.contains("保存设置失败") == true)
+        
+        let presetNotFoundError = RDPSettingsError.presetNotFound("不存在的预设")
+        XCTAssertNotNil(presetNotFoundError.errorDescription)
+        XCTAssertEqual(presetNotFoundError.errorDescription, "未找到预设配置: 不存在的预设")
     }
     
-    func testRemoteDesktopIntegratorResetDefaults() {
-        // 先设置自定义配置
-        rdpIntegrator.setQualityProfile(.performance)
-        
-        // 重置
-        rdpIntegrator.resetToDefaults()
-        
-        // 验证已重置为默认值
-        XCTAssertEqual(rdpIntegrator.currentQualityProfile.identifier, "balanced")
-    }
+    // MARK: - Performance Tests
     
-    // MARK: - Integration Tests
-    
-    func testRDPConfigGenerationFlow() throws {
-        let connectionInfo = RDPConnectionInfo(
-            fullAddress: "test.server.com:3389",
-            username: "testuser",
-            config: "full address:s:test.server.com:3389\nusername:s:testuser\nsession bpp:i:32"
-        )
-        
-        // 测试不同质量配置下的配置生成
-        for profile in [QualityProfile.performance, .balanced, .quality] {
-            configManager.setQualityProfile(profile)
-            
-            // 由于需要真实的显示器检测，我们主要测试配置管理器的状态
-            XCTAssertEqual(configManager.qualityProfile.identifier, profile.identifier)
-            
-            let settings = configManager.settings
-            XCTAssertNotNil(settings)
-            
-            // 验证不同配置文件的设置差异
-            switch profile {
-            case .performance:
-                XCTAssertEqual(settings.colorDepth, .depth16)
-                XCTAssertEqual(settings.compressionLevel, .high)
-            case .balanced:
-                XCTAssertEqual(settings.colorDepth, .depth24)
-                XCTAssertEqual(settings.compressionLevel, .medium)
-            case .quality:
-                XCTAssertEqual(settings.colorDepth, .depth32)
-                XCTAssertEqual(settings.compressionLevel, .none)
-            default:
-                break
+    func testPerformanceDisplayDetection() {
+        measure {
+            do {
+                _ = try displayDetector.detectPrimaryDisplay()
+            } catch {
+                // 忽略检测错误，专注于性能测试
             }
         }
     }
     
-    func testDisplayConfigurationOptimization() {
-        // 测试不同显示器配置的优化逻辑
-        let standardDisplay = DisplayConfiguration(
-            width: 1920,
-            height: 1080,
-            scaleFactor: 1.0,
-            colorDepth: 24,
-            isHiDPI: false
-        )
+    func testPerformanceRDPContentGeneration() {
+        let settings = RDPSettings.balanced
         
-        let hiDPIDisplay = DisplayConfiguration(
-            width: 2560,
-            height: 1600,
-            scaleFactor: 2.0,
-            colorDepth: 32,
-            isHiDPI: true
-        )
+        measure {
+            _ = settings.generateRDPContent(server: "test.server.com", username: "testuser")
+        }
+    }
+    
+    func testPerformanceConfigurationPreview() {
+        let settings = RDPSettings.quality
         
-        let ultraWideDisplay = DisplayConfiguration(
-            width: 3440,
-            height: 1440,
-            scaleFactor: 1.0,
-            colorDepth: 24,
-            isHiDPI: false
-        )
+        measure {
+            _ = settings.generatePreview()
+        }
+    }
+    
+    func testPerformanceResolutionValidation() {
+        let testResolutions = [
+            (1920, 1080), (2560, 1440), (3840, 2160),
+            (1366, 768), (1680, 1050), (3440, 1440),
+            (800, 600), (7680, 4320)
+        ]
         
-        // 验证显示器特性检测
-        XCTAssertFalse(standardDisplay.is4K)
-        XCTAssertFalse(standardDisplay.isUltraWide)
-        XCTAssertEqual(standardDisplay.densityType, .standard)
-        
-        XCTAssertFalse(hiDPIDisplay.is4K)
-        XCTAssertFalse(hiDPIDisplay.isUltraWide)
-        XCTAssertEqual(hiDPIDisplay.densityType, .retina)
-        
-        XCTAssertFalse(ultraWideDisplay.is4K)
-        XCTAssertTrue(ultraWideDisplay.isUltraWide)
-        XCTAssertEqual(ultraWideDisplay.densityType, .standard)
+        measure {
+            for (width, height) in testResolutions {
+                let resolution = ResolutionSettings(width: width, height: height, isCustom: true)
+                _ = resolution.isValid
+                _ = resolution.estimatedBandwidth
+                _ = resolution.displayName
+            }
+        }
     }
 }

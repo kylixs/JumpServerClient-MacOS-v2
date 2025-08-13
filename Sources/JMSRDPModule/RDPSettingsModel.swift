@@ -7,6 +7,92 @@
 
 import Foundation
 
+// MARK: - 分辨率设置
+public struct ResolutionSettings: Codable {
+    public var width: Int
+    public var height: Int
+    public var isCustom: Bool
+    public var presetName: String?
+    
+    public init(width: Int, height: Int, isCustom: Bool = false, presetName: String? = nil) {
+        self.width = width
+        self.height = height
+        self.isCustom = isCustom
+        self.presetName = presetName
+    }
+    
+    // 预设分辨率
+    public static let fullHD = ResolutionSettings(width: 1920, height: 1080, presetName: "Full HD")
+    public static let twoK = ResolutionSettings(width: 2560, height: 1440, presetName: "2K")
+    public static let fourK = ResolutionSettings(width: 3840, height: 2160, presetName: "4K")
+    
+    public static var presets: [ResolutionSettings] {
+        return [fullHD, twoK, fourK]
+    }
+    
+    public var displayName: String {
+        if let presetName = presetName {
+            return "\(width)×\(height) (\(presetName))"
+        } else if isCustom {
+            return "\(width)×\(height) (自定义)"
+        } else {
+            return "\(width)×\(height)"
+        }
+    }
+    
+    public var isValid: Bool {
+        return width >= 800 && width <= 7680 && height >= 600 && height <= 4320
+    }
+    
+    public var estimatedBandwidth: String {
+        let pixels = width * height
+        switch pixels {
+        case 0..<2073600: // < 1920x1080
+            return "< 5 Mbps"
+        case 2073600..<3686400: // 1920x1080 - 2560x1440
+            return "5-10 Mbps"
+        case 3686400..<8294400: // 2560x1440 - 3840x2160
+            return "10-25 Mbps"
+        default: // > 4K
+            return "> 25 Mbps"
+        }
+    }
+}
+
+// MARK: - HiDPI设置
+public struct HiDPISettings: Codable {
+    public var enabled: Bool
+    public var scaleFactor: Double
+    public var autoDetect: Bool
+    public var forceHiDPI: Bool
+    
+    public init(enabled: Bool = false, scaleFactor: Double = 1.0, autoDetect: Bool = true, forceHiDPI: Bool = false) {
+        self.enabled = enabled
+        self.scaleFactor = scaleFactor
+        self.autoDetect = autoDetect
+        self.forceHiDPI = forceHiDPI
+    }
+    
+    public var scaleFactorDescription: String {
+        switch scaleFactor {
+        case 1.0:
+            return "100% (标准)"
+        case 1.25:
+            return "125% (小)"
+        case 1.5:
+            return "150% (中)"
+        case 2.0:
+            return "200% (大)"
+        case 2.5:
+            return "250% (更大)"
+        case 3.0:
+            return "300% (最大)"
+        default:
+            return "\(Int(scaleFactor * 100))% (自定义)"
+        }
+    }
+}
+
 // MARK: - RDP设置数据模型
 public struct RDPSettings: Codable {
     public var profileName: String
@@ -18,6 +104,11 @@ public struct RDPSettings: Codable {
     public var enableMenuAnimations: Bool
     public var enableThemes: Bool
     
+    // 新增：分辨率和HiDPI设置
+    public var resolution: ResolutionSettings
+    public var hiDPI: HiDPISettings
+    public var useAutoDetection: Bool
+    
     public init(
         profileName: String,
         compressionLevel: Int,
@@ -26,7 +117,10 @@ public struct RDPSettings: Codable {
         enableFontSmoothing: Bool,
         enableWallpaper: Bool,
         enableMenuAnimations: Bool,
-        enableThemes: Bool
+        enableThemes: Bool,
+        resolution: ResolutionSettings = ResolutionSettings.fullHD,
+        hiDPI: HiDPISettings = HiDPISettings(),
+        useAutoDetection: Bool = true
     ) {
         self.profileName = profileName
         self.compressionLevel = compressionLevel
@@ -36,6 +130,9 @@ public struct RDPSettings: Codable {
         self.enableWallpaper = enableWallpaper
         self.enableMenuAnimations = enableMenuAnimations
         self.enableThemes = enableThemes
+        self.resolution = resolution
+        self.hiDPI = hiDPI
+        self.useAutoDetection = useAutoDetection
     }
     
     // MARK: - 预设配置
@@ -47,7 +144,10 @@ public struct RDPSettings: Codable {
         enableFontSmoothing: false,
         enableWallpaper: false,
         enableMenuAnimations: false,
-        enableThemes: false
+        enableThemes: false,
+        resolution: ResolutionSettings.fullHD,
+        hiDPI: HiDPISettings(enabled: false, scaleFactor: 1.0),
+        useAutoDetection: false
     )
     
     public static let balanced = RDPSettings(
@@ -58,7 +158,10 @@ public struct RDPSettings: Codable {
         enableFontSmoothing: true,
         enableWallpaper: true,
         enableMenuAnimations: false,
-        enableThemes: true
+        enableThemes: true,
+        resolution: ResolutionSettings.fullHD,
+        hiDPI: HiDPISettings(enabled: true, scaleFactor: 1.5),
+        useAutoDetection: true
     )
     
     public static let quality = RDPSettings(
@@ -69,7 +172,10 @@ public struct RDPSettings: Codable {
         enableFontSmoothing: true,
         enableWallpaper: true,
         enableMenuAnimations: true,
-        enableThemes: true
+        enableThemes: true,
+        resolution: ResolutionSettings.twoK,
+        hiDPI: HiDPISettings(enabled: true, scaleFactor: 2.0),
+        useAutoDetection: true
     )
     
     // MARK: - 静态方法
@@ -88,7 +194,7 @@ public struct RDPSettings: Codable {
     
     /// 生成RDP配置文件内容
     public func generateRDPContent(server: String, username: String) -> String {
-        return """
+        var content = """
         full address:s:\(server)
         username:s:\(username)
         audiomode:i:\(getAudioMode())
@@ -96,13 +202,21 @@ public struct RDPSettings: Codable {
         session bpp:i:\(colorDepth)
         smart sizing:i:1
         screen mode id:i:2
-        desktopwidth:i:1920
-        desktopheight:i:1080
+        desktopwidth:i:\(resolution.width)
+        desktopheight:i:\(resolution.height)
         font smoothing:i:\(enableFontSmoothing ? 1 : 0)
         disable wallpaper:i:\(enableWallpaper ? 0 : 1)
         disable menu anims:i:\(enableMenuAnimations ? 0 : 1)
         disable themes:i:\(enableThemes ? 0 : 1)
         """
+        
+        // 添加HiDPI相关设置
+        if hiDPI.enabled {
+            content += "\ndesktopscalefactor:i:\(Int(hiDPI.scaleFactor * 100))"
+            content += "\nhidef color depth:i:\(colorDepth)"
+        }
+        
+        return content
     }
     
     /// 生成配置预览文本
@@ -111,6 +225,13 @@ public struct RDPSettings: Codable {
         # RDP配置预览
         
         配置文件: \(profileName)
+        
+        显示设置:
+        分辨率: \(resolution.displayName)
+        HiDPI: \(hiDPI.enabled ? "启用 (\(hiDPI.scaleFactorDescription))" : "禁用")
+        自动检测: \(useAutoDetection ? "启用" : "禁用")
+        
+        质量设置:
         压缩级别: \(compressionLevel == 0 ? "无压缩" : (compressionLevel == 1 ? "中等" : "高压缩"))
         颜色深度: \(colorDepth)位
         音频质量: \(audioQuality)
@@ -120,6 +241,10 @@ public struct RDPSettings: Codable {
         \(enableWallpaper ? "✓" : "✗") 桌面壁纸
         \(enableMenuAnimations ? "✓" : "✗") 菜单动画
         \(enableThemes ? "✓" : "✗") 视觉主题
+        
+        性能预估:
+        预计带宽: \(resolution.estimatedBandwidth)
+        清晰度评级: \(getClarityRating())
         
         适用场景:
         \(getScenarioDescription())
@@ -137,6 +262,28 @@ public struct RDPSettings: Codable {
         case "中等": return 0
         case "高质量": return 0
         default: return 0
+        }
+    }
+    
+    private func getClarityRating() -> String {
+        let pixels = resolution.width * resolution.height
+        let hiDPIBonus = hiDPI.enabled ? 1 : 0
+        let colorBonus = colorDepth >= 24 ? 1 : 0
+        let compressionPenalty = compressionLevel
+        
+        let score = (pixels / 1000000) + hiDPIBonus + colorBonus - compressionPenalty
+        
+        switch score {
+        case ..<1:
+            return "基础 ⭐"
+        case 1..<3:
+            return "良好 ⭐⭐"
+        case 3..<5:
+            return "优秀 ⭐⭐⭐"
+        case 5..<8:
+            return "极佳 ⭐⭐⭐⭐"
+        default:
+            return "完美 ⭐⭐⭐⭐⭐"
         }
     }
     

@@ -23,6 +23,18 @@ public class RDPConfigManager {
         }
     }
     
+    // 为测试提供公共初始化器
+    public convenience init(forTesting: Bool) {
+        self.init()
+    }
+    
+    // MARK: - 公共属性
+    
+    /// 当前设置
+    public var currentSettings: RDPSettings {
+        return currentQualityProfile.settings
+    }
+    
     // MARK: - 主要接口
     
     /// 生成优化的RDP配置
@@ -217,6 +229,15 @@ public enum QualityProfile {
         case .balanced: return "balanced"
         case .quality: return "quality"
         case .custom: return "custom"
+        }
+    }
+    
+    public var settings: RDPSettings {
+        switch self {
+        case .performance: return RDPSettings.performance
+        case .balanced: return RDPSettings.balanced
+        case .quality: return RDPSettings.quality
+        case .custom(let settings): return settings
         }
     }
     

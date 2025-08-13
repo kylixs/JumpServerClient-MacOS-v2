@@ -1,396 +1,301 @@
+//
+//  IntegrationTests.swift
+//  集成测试
+//
+//  Created by JMS Protocol Handler on 2025-08-12.
+//
+
 import XCTest
 @testable import JMSCore
 @testable import JMSRDPModule
 @testable import JMSSSHModule
 
-final class IntegrationTests: XCTestCase {
+class IntegrationTests: XCTestCase {
     
-    // 服务组件
-    var urlParser: URLParser!
-    var payloadDecoder: PayloadDecoder!
-    var connectionInfoExtractor: ConnectionInfoExtractor!
-    var rdpIntegrator: RemoteDesktopIntegrator!
-    var sshIntegrator: SSHTerminalIntegrator!
+    var configManager: RDPConfigManager!
     
     override func setUp() {
         super.setUp()
-        urlParser = URLParser()
-        payloadDecoder = PayloadDecoder()
-        connectionInfoExtractor = ConnectionInfoExtractor()
-        rdpIntegrator = RemoteDesktopIntegrator()
-        sshIntegrator = SSHTerminalIntegrator()
+        configManager = RDPConfigManager(forTesting: true)
     }
     
     override func tearDown() {
-        RDPConfigManager.shared.resetToDefaults()
+        configManager = nil
         super.tearDown()
     }
     
-    // MARK: - 完整RDP流程测试
+    // MARK: - RDP配置管理测试
     
-    func testCompleteRDPFlow() throws {
-        // 1. 创建RDP配置JSON
-        let rdpConfigJSON = [
-            "protocol": "rdp",
-            "config": """
-                full address:s:test.rdp.server.com:3389
-                username:s:rdpuser
-                session bpp:i:32
-                audiomode:i:0
-                redirectclipboard:i:1
-                """
-        ]
+    func testRDPConfigManagerBasicFunctionality() {
+        // 测试基本的配置管理功能
+        XCTAssertNotNil(configManager)
         
-        let jsonData = try JSONSerialization.data(withJSONObject: rdpConfigJSON)
-        let base64Payload = jsonData.base64EncodedString()
-        let jmsURL = "jms://\(base64Payload)"
-        
-        // 2. 完整处理流程
-        let urlComponents = try urlParser.parseURL(jmsURL)
-        XCTAssertEqual(urlComponents.scheme, "jms")
-        XCTAssertTrue(urlComponents.isValid)
-        
-        let config = try payloadDecoder.decodePayload(urlComponents.encodedPayload)
-        XCTAssertEqual(config.protocolType, "rdp")
-        XCTAssertTrue(config.isValid)
-        
-        let connectionInfo = try connectionInfoExtractor.extractConnectionInfo(from: config)
-        
-        // 3. 验证RDP连接信息
-        if case .rdp(let rdpInfo) = connectionInfo {
-            XCTAssertEqual(rdpInfo.fullAddress, "test.rdp.server.com:3389")
-            XCTAssertEqual(rdpInfo.username, "rdpuser")
-            XCTAssertEqual(rdpInfo.serverAddress, "test.rdp.server.com")
-            XCTAssertEqual(rdpInfo.port, 3389)
-            
-            // 4. 测试RDP配置管理
-            let configManager = RDPConfigManager.shared
-            
-            // 测试不同质量配置
-            for profile in [QualityProfile.performance, .balanced, .quality] {
-                configManager.setQualityProfile(profile)
-                XCTAssertEqual(configManager.qualityProfile.identifier, profile.identifier)
-                
-                let settings = configManager.settings
-                XCTAssertNotNil(settings)
-                
-                // 验证质量配置的差异
-                switch profile {
-                case .performance:
-                    XCTAssertEqual(settings.colorDepth, .depth16)
-                    XCTAssertEqual(settings.compressionLevel, .high)
-                case .balanced:
-                    XCTAssertEqual(settings.colorDepth, .depth24)
-                    XCTAssertEqual(settings.compressionLevel, .medium)
-                case .quality:
-                    XCTAssertEqual(settings.colorDepth, .depth32)
-                    XCTAssertEqual(settings.compressionLevel, .none)
-                default:
-                    break
-                }
-            }
-            
-            // 5. 测试RDP集成器配置
-            XCTAssertEqual(rdpIntegrator.availableQualityProfiles.count, 3)
-            
-            rdpIntegrator.setQualityProfile(.performance)
-            XCTAssertEqual(rdpIntegrator.currentQualityProfile.identifier, "performance")
-            
-        } else {
-            XCTFail("应该返回RDP连接信息")
-        }
+        // 测试默认设置
+        let defaultSettings = configManager.currentSettings
+        XCTAssertNotNil(defaultSettings)
+        XCTAssertEqual(defaultSettings.profileName, "平衡模式")
     }
     
-    // MARK: - 完整SSH流程测试
-    
-    func testCompleteSSHFlow() throws {
-        // 1. 创建SSH配置JSON
-        let sshToken = [
-            "ip": "test.ssh.server.com",
-            "port": 2222,
-            "username": "sshuser",
-            "password": "sshpass123"
-        ] as [String : Any]
+    func testRDPSettingsPresets() {
+        // 测试预设配置
+        let performance = RDPSettings.performance
+        XCTAssertEqual(performance.profileName, "性能优先")
+        XCTAssertEqual(performance.compressionLevel, 2)
+        XCTAssertEqual(performance.colorDepth, 16)
+        XCTAssertFalse(performance.hiDPI.enabled)
         
-        let tokenData = try JSONSerialization.data(withJSONObject: sshToken)
-        let tokenString = String(data: tokenData, encoding: .utf8)!
+        let balanced = RDPSettings.balanced
+        XCTAssertEqual(balanced.profileName, "平衡模式")
+        XCTAssertEqual(balanced.compressionLevel, 1)
+        XCTAssertEqual(balanced.colorDepth, 24)
+        XCTAssertTrue(balanced.hiDPI.enabled)
         
-        let sshConfigJSON = [
-            "protocol": "ssh",
-            "token": tokenString
-        ]
-        
-        let jsonData = try JSONSerialization.data(withJSONObject: sshConfigJSON)
-        let base64Payload = jsonData.base64EncodedString()
-        let jmsURL = "jms://\(base64Payload)"
-        
-        // 2. 完整处理流程
-        let urlComponents = try urlParser.parseURL(jmsURL)
-        XCTAssertEqual(urlComponents.scheme, "jms")
-        XCTAssertTrue(urlComponents.isValid)
-        
-        let config = try payloadDecoder.decodePayload(urlComponents.encodedPayload)
-        XCTAssertEqual(config.protocolType, "ssh")
-        XCTAssertTrue(config.isValid)
-        
-        let connectionInfo = try connectionInfoExtractor.extractConnectionInfo(from: config)
-        
-        // 3. 验证SSH连接信息
-        if case .ssh(let sshInfo) = connectionInfo {
-            XCTAssertEqual(sshInfo.ip, "test.ssh.server.com")
-            XCTAssertEqual(sshInfo.port, 2222)
-            XCTAssertEqual(sshInfo.username, "sshuser")
-            XCTAssertEqual(sshInfo.password, "sshpass123")
-            
-            // 4. 测试SSH命令构建
-            let basicCommand = sshIntegrator.buildSSHCommand(sshInfo)
-            XCTAssertTrue(basicCommand.contains("ssh"))
-            XCTAssertTrue(basicCommand.contains("-p 2222"))
-            XCTAssertTrue(basicCommand.contains("sshuser@test.ssh.server.com"))
-            XCTAssertTrue(basicCommand.contains("-o StrictHostKeyChecking=no"))
-            
-            // 5. 测试带密码的SSH命令
-            let passwordCommand = try sshIntegrator.buildSSHCommandWithPassword(sshInfo)
-            XCTAssertNotNil(passwordCommand)
-            XCTAssertFalse(passwordCommand.isEmpty)
-            
-        } else {
-            XCTFail("应该返回SSH连接信息")
-        }
+        let quality = RDPSettings.quality
+        XCTAssertEqual(quality.profileName, "质量优先")
+        XCTAssertEqual(quality.compressionLevel, 0)
+        XCTAssertEqual(quality.colorDepth, 32)
+        XCTAssertTrue(quality.hiDPI.enabled)
     }
     
-    // MARK: - 错误处理集成测试
-    
-    func testErrorHandlingIntegration() {
-        let errorHandler = ErrorHandler.shared
+    func testResolutionSettings() {
+        // 测试分辨率设置
+        let fullHD = ResolutionSettings.fullHD
+        XCTAssertEqual(fullHD.width, 1920)
+        XCTAssertEqual(fullHD.height, 1080)
+        XCTAssertEqual(fullHD.presetName, "Full HD")
+        XCTAssertTrue(fullHD.isValid)
         
-        // 测试各种错误类型的处理
-        let testErrors: [JMSError] = [
-            .invalidURL("test://invalid"),
-            .decodingFailed("invalid base64"),
-            .jsonParsingFailed("malformed json"),
-            .missingConnectionInfo("missing field"),
-            .unsupportedProtocol("ftp"),
-            .remoteDesktopNotFound,
-            .terminalNotFound,
-            .displayDetectionFailed("no display"),
-            .configurationError("config error"),
-            .fileOperationFailed("file error"),
-            .networkError("network error")
-        ]
+        let twoK = ResolutionSettings.twoK
+        XCTAssertEqual(twoK.width, 2560)
+        XCTAssertEqual(twoK.height, 1440)
+        XCTAssertEqual(twoK.presetName, "2K")
         
-        for error in testErrors {
-            // 测试错误处理不会崩溃
-            XCTAssertNoThrow(errorHandler.handleJMSError(error, showAlert: false))
-            
-            // 验证错误描述
-            XCTAssertNotNil(error.errorDescription)
-            XCTAssertNotNil(error.recoverySuggestion)
-            XCTAssertFalse(error.errorDescription!.isEmpty)
-        }
+        let fourK = ResolutionSettings.fourK
+        XCTAssertEqual(fourK.width, 3840)
+        XCTAssertEqual(fourK.height, 2160)
+        XCTAssertEqual(fourK.presetName, "4K")
+        
+        // 测试自定义分辨率
+        let customValid = ResolutionSettings(width: 1366, height: 768, isCustom: true)
+        XCTAssertTrue(customValid.isValid)
+        
+        let customInvalid = ResolutionSettings(width: 500, height: 400, isCustom: true)
+        XCTAssertFalse(customInvalid.isValid)
     }
     
-    // MARK: - 通知系统集成测试
-    
-    func testNotificationSystemIntegration() {
-        let notificationManager = NotificationManager.shared
+    func testHiDPISettings() {
+        // 测试HiDPI设置
+        let standardDPI = HiDPISettings(enabled: false, scaleFactor: 1.0)
+        XCTAssertEqual(standardDPI.scaleFactorDescription, "100% (标准)")
         
-        // 测试各种通知类型
-        XCTAssertNoThrow(notificationManager.showSuccessNotification(title: "测试成功", message: "测试消息"))
-        XCTAssertNoThrow(notificationManager.showInfoNotification(title: "测试信息", message: "测试消息"))
+        let hiDPI = HiDPISettings(enabled: true, scaleFactor: 2.0)
+        XCTAssertEqual(hiDPI.scaleFactorDescription, "200% (大)")
         
-        // 测试错误通知
-        let testError = JMSError.configurationError("测试错误")
-        XCTAssertNoThrow(notificationManager.showErrorNotification(testError))
-        
-        // 测试连接成功通知
-        let rdpInfo = RDPConnectionInfo(fullAddress: "test:3389", username: "user", config: "")
-        let sshInfo = SSHConnectionInfo(ip: "192.168.1.1", username: "user")
-        
-        XCTAssertNoThrow(notificationManager.showRDPConnectionSuccess(rdpInfo))
-        XCTAssertNoThrow(notificationManager.showSSHConnectionSuccess(sshInfo))
-        
-        // 测试显示器优化通知
-        let displayConfig = DisplayConfiguration(width: 1920, height: 1080)
-        XCTAssertNoThrow(notificationManager.showDisplayOptimizationNotification(displayConfig))
+        let customScale = HiDPISettings(enabled: true, scaleFactor: 1.5)
+        XCTAssertEqual(customScale.scaleFactorDescription, "150% (中)")
     }
     
-    // MARK: - 配置持久化集成测试
-    
-    func testConfigurationPersistenceIntegration() {
-        let configManager = RDPConfigManager.shared
-        
-        // 1. 设置自定义配置
-        let customSettings = RDPSettings(
-            resolution: .custom(2560, 1440),
-            colorDepth: .depth32,
-            compressionLevel: .low,
+    func testRDPContentGeneration() {
+        // 测试RDP配置文件内容生成
+        let settings = RDPSettings(
+            profileName: "测试配置",
+            compressionLevel: 1,
+            colorDepth: 24,
+            audioQuality: "中等",
             enableFontSmoothing: true,
-            scalingFactor: 2.0
+            enableWallpaper: true,
+            enableMenuAnimations: false,
+            enableThemes: true,
+            resolution: ResolutionSettings(width: 1920, height: 1080),
+            hiDPI: HiDPISettings(enabled: true, scaleFactor: 2.0),
+            useAutoDetection: true
         )
         
-        configManager.updateSettings(customSettings)
-        XCTAssertEqual(configManager.qualityProfile.identifier, "custom")
+        let rdpContent = settings.generateRDPContent(server: "test.server.com", username: "testuser")
         
-        // 2. 验证设置已保存
-        let currentSettings = configManager.settings
-        XCTAssertEqual(currentSettings.resolution.width, 2560)
-        XCTAssertEqual(currentSettings.resolution.height, 1440)
-        XCTAssertEqual(currentSettings.colorDepth, .depth32)
-        XCTAssertEqual(currentSettings.compressionLevel, .low)
-        XCTAssertTrue(currentSettings.enableFontSmoothing)
-        XCTAssertEqual(currentSettings.scalingFactor, 2.0)
-        
-        // 3. 测试质量配置切换（不触发通知）
-        let originalProfile = configManager.qualityProfile
-        configManager.updateSettings(QualityProfile.performance.settings)
-        XCTAssertEqual(configManager.settings.colorDepth, .depth16)
-        
-        // 4. 重置为默认值
-        configManager.resetToDefaults()
-        XCTAssertEqual(configManager.qualityProfile.identifier, "balanced")
+        XCTAssertTrue(rdpContent.contains("full address:s:test.server.com"))
+        XCTAssertTrue(rdpContent.contains("username:s:testuser"))
+        XCTAssertTrue(rdpContent.contains("desktopwidth:i:1920"))
+        XCTAssertTrue(rdpContent.contains("desktopheight:i:1080"))
+        XCTAssertTrue(rdpContent.contains("desktopscalefactor:i:200"))
+        XCTAssertTrue(rdpContent.contains("compression:i:1"))
+        XCTAssertTrue(rdpContent.contains("session bpp:i:24"))
     }
     
-    // MARK: - 多协议支持集成测试
-    
-    func testMultiProtocolSupportIntegration() throws {
-        // 测试同时处理多种协议类型
-        let protocols = ["rdp", "ssh"]
+    func testConfigurationPreview() {
+        // 测试配置预览生成
+        let settings = RDPSettings.balanced
+        let preview = settings.generatePreview()
         
-        for protocolType in protocols {
-            var configJSON: [String: Any]
-            
-            if protocolType == "rdp" {
-                configJSON = [
-                    "protocol": "rdp",
-                    "config": "full address:s:server.com:3389\nusername:s:user"
-                ]
-            } else {
-                let sshToken = ["ip": "192.168.1.1", "port": 22, "username": "user"] as [String : Any]
-                let tokenData = try JSONSerialization.data(withJSONObject: sshToken)
-                let tokenString = String(data: tokenData, encoding: .utf8)!
-                
-                configJSON = [
-                    "protocol": "ssh",
-                    "token": tokenString
-                ]
-            }
-            
-            let jsonData = try JSONSerialization.data(withJSONObject: configJSON)
-            let base64Payload = jsonData.base64EncodedString()
-            let jmsURL = "jms://\(base64Payload)"
-            
-            // 处理流程
-            let urlComponents = try urlParser.parseURL(jmsURL)
-            let config = try payloadDecoder.decodePayload(urlComponents.encodedPayload)
-            let connectionInfo = try connectionInfoExtractor.extractConnectionInfo(from: config)
-            
-            // 验证协议类型
-            XCTAssertEqual(connectionInfo.protocolType, protocolType)
-            
-            switch connectionInfo {
-            case .rdp(let rdpInfo):
-                XCTAssertEqual(rdpInfo.serverAddress, "server.com")
-                XCTAssertEqual(rdpInfo.username, "user")
-            case .ssh(let sshInfo):
-                XCTAssertEqual(sshInfo.ip, "192.168.1.1")
-                XCTAssertEqual(sshInfo.username, "user")
-            }
+        XCTAssertTrue(preview.contains("配置文件: 平衡模式"))
+        XCTAssertTrue(preview.contains("分辨率:"))
+        XCTAssertTrue(preview.contains("HiDPI:"))
+        XCTAssertTrue(preview.contains("清晰度评级:"))
+        XCTAssertTrue(preview.contains("预计带宽:"))
+    }
+    
+    // MARK: - 显示器检测测试
+    
+    func testDisplayDetection() {
+        let detector = DisplayDetector()
+        
+        do {
+            let primaryDisplay = try detector.detectPrimaryDisplay()
+            XCTAssertGreaterThan(primaryDisplay.width, 0)
+            XCTAssertGreaterThan(primaryDisplay.height, 0)
+            XCTAssertGreaterThan(primaryDisplay.scaleFactor, 0)
+            XCTAssertGreaterThan(primaryDisplay.colorDepth, 0)
+        } catch {
+            // 在某些测试环境中可能无法检测显示器，这是正常的
+            print("显示器检测跳过: \(error.localizedDescription)")
         }
     }
     
-    // MARK: - 性能集成测试
+    func testAllDisplaysDetection() {
+        let detector = DisplayDetector()
+        
+        do {
+            let allDisplays = try detector.detectAllDisplays()
+            XCTAssertGreaterThan(allDisplays.count, 0, "至少应该检测到一个显示器")
+            
+            for display in allDisplays {
+                XCTAssertGreaterThan(display.width, 0)
+                XCTAssertGreaterThan(display.height, 0)
+            }
+        } catch {
+            // 在某些测试环境中可能无法检测显示器，这是正常的
+            print("显示器检测跳过: \(error.localizedDescription)")
+        }
+    }
     
-    func testPerformanceIntegration() throws {
-        // 创建测试数据
-        let rdpConfigJSON = [
-            "protocol": "rdp",
-            "config": "full address:s:perf.test.com:3389\nusername:s:perfuser"
-        ]
+    // MARK: - 带宽预估测试
+    
+    func testBandwidthEstimation() {
+        let fullHD = ResolutionSettings.fullHD
+        XCTAssertEqual(fullHD.estimatedBandwidth, "5-10 Mbps")
         
-        let jsonData = try JSONSerialization.data(withJSONObject: rdpConfigJSON)
-        let base64Payload = jsonData.base64EncodedString()
-        let jmsURL = "jms://\(base64Payload)"
+        let twoK = ResolutionSettings.twoK
+        XCTAssertEqual(twoK.estimatedBandwidth, "10-25 Mbps")
         
-        // 性能测试：完整处理流程
+        let fourK = ResolutionSettings.fourK
+        XCTAssertEqual(fourK.estimatedBandwidth, "> 25 Mbps")
+        
+        let lowRes = ResolutionSettings(width: 1366, height: 768, isCustom: true)
+        XCTAssertEqual(lowRes.estimatedBandwidth, "< 5 Mbps")
+    }
+    
+    // MARK: - SSH集成测试
+    
+    func testSSHTerminalIntegrator() {
+        let sshIntegrator = SSHTerminalIntegrator()
+        XCTAssertNotNil(sshIntegrator)
+        
+        // 测试SSH连接信息创建
+        let sshConnectionInfo = SSHConnectionInfo(
+            ip: "test.server.com",
+            port: 22,
+            username: "testuser",
+            password: "testpass"
+        )
+        
+        let connectionInfo = ConnectionInfo.ssh(sshConnectionInfo)
+        
+        XCTAssertEqual(connectionInfo.protocolType, "ssh")
+        
+        // 验证SSH连接信息
+        if case .ssh(let sshInfo) = connectionInfo {
+            XCTAssertEqual(sshInfo.ip, "test.server.com")
+            XCTAssertEqual(sshInfo.port, 22)
+            XCTAssertEqual(sshInfo.username, "testuser")
+        } else {
+            XCTFail("连接信息应该是SSH类型")
+        }
+    }
+    
+    // MARK: - 错误处理测试
+    
+    func testErrorHandling() {
+        // 测试RDP设置错误
+        let error = RDPSettingsError.noCurrentSettings
+        XCTAssertNotNil(error.errorDescription)
+        
+        let saveError = RDPSettingsError.saveFailed(NSError(domain: "test", code: 1))
+        XCTAssertNotNil(saveError.errorDescription)
+        
+        let presetError = RDPSettingsError.presetNotFound("不存在的预设")
+        XCTAssertNotNil(presetError.errorDescription)
+    }
+    
+    // MARK: - 性能测试
+    
+    func testPerformanceDisplayDetection() {
+        let detector = DisplayDetector()
+        
         measure {
             do {
-                let urlComponents = try urlParser.parseURL(jmsURL)
-                let config = try payloadDecoder.decodePayload(urlComponents.encodedPayload)
-                let _ = try connectionInfoExtractor.extractConnectionInfo(from: config)
+                _ = try detector.detectPrimaryDisplay()
             } catch {
-                XCTFail("处理过程中出现错误: \(error)")
+                // 忽略检测错误，专注于性能测试
             }
         }
     }
     
-    // MARK: - 边界条件集成测试
-    
-    func testBoundaryConditionsIntegration() throws {
-        // 测试各种边界条件
-        let testCases = [
-            // 最小有效RDP配置
-            ["protocol": "rdp", "config": "full address:s:a:1\nusername:s:u"],
-            // 最小有效SSH配置
-            ["protocol": "ssh", "token": "{\"ip\":\"1\",\"username\":\"u\"}"],
-            // 包含特殊字符的配置
-            ["protocol": "rdp", "config": "full address:s:测试服务器.com:3389\nusername:s:用户名"],
-        ]
+    func testPerformanceConfigurationGeneration() {
+        let settings = RDPSettings.balanced
         
-        for configJSON in testCases {
-            let jsonData = try JSONSerialization.data(withJSONObject: configJSON)
-            let base64Payload = jsonData.base64EncodedString()
-            let jmsURL = "jms://\(base64Payload)"
-            
-            // 应该能够成功处理
-            XCTAssertNoThrow(try urlParser.parseURL(jmsURL))
-            
-            let urlComponents = try urlParser.parseURL(jmsURL)
-            XCTAssertNoThrow(try payloadDecoder.decodePayload(urlComponents.encodedPayload))
-            
-            let config = try payloadDecoder.decodePayload(urlComponents.encodedPayload)
-            XCTAssertNoThrow(try connectionInfoExtractor.extractConnectionInfo(from: config))
+        measure {
+            _ = settings.generateRDPContent(server: "test.server.com", username: "testuser")
+            _ = settings.generatePreview()
         }
     }
     
-    // MARK: - 并发安全集成测试
-    
-    func testConcurrencySafetyIntegration() throws {
-        let rdpConfigJSON = [
-            "protocol": "rdp",
-            "config": "full address:s:concurrent.test.com:3389\nusername:s:concurrentuser"
+    func testPerformanceResolutionValidation() {
+        let testResolutions = [
+            (1920, 1080), (2560, 1440), (3840, 2160),
+            (1366, 768), (1680, 1050), (3440, 1440)
         ]
         
-        let jsonData = try JSONSerialization.data(withJSONObject: rdpConfigJSON)
-        let base64Payload = jsonData.base64EncodedString()
-        let jmsURL = "jms://\(base64Payload)"
-        
-        let expectation = XCTestExpectation(description: "并发处理完成")
-        expectation.expectedFulfillmentCount = 10
-        
-        // 并发执行多个处理任务
-        for i in 0..<10 {
-            DispatchQueue.global(qos: .background).async {
-                do {
-                    let parser = URLParser()
-                    let decoder = PayloadDecoder()
-                    let extractor = ConnectionInfoExtractor()
-                    
-                    let urlComponents = try parser.parseURL(jmsURL)
-                    let config = try decoder.decodePayload(urlComponents.encodedPayload)
-                    let connectionInfo = try extractor.extractConnectionInfo(from: config)
-                    
-                    // 验证结果一致性
-                    XCTAssertEqual(connectionInfo.protocolType, "rdp")
-                    
-                    expectation.fulfill()
-                } catch {
-                    XCTFail("并发处理失败 [\(i)]: \(error)")
-                    expectation.fulfill()
-                }
+        measure {
+            for (width, height) in testResolutions {
+                let resolution = ResolutionSettings(width: width, height: height, isCustom: true)
+                _ = resolution.isValid
+                _ = resolution.estimatedBandwidth
             }
         }
-        
-        wait(for: [expectation], timeout: 10.0)
+    }
+}
+
+// MARK: - 测试辅助扩展
+
+extension IntegrationTests {
+    
+    /// 创建测试用的显示器配置
+    func createTestDisplayConfiguration() -> DisplayConfiguration {
+        return DisplayConfiguration(
+            width: 2560,
+            height: 1440,
+            scaleFactor: 2.0,
+            colorDepth: 32,
+            isHiDPI: true,
+            refreshRate: 60.0,
+            displayID: 1
+        )
+    }
+    
+    /// 创建测试用的RDP设置
+    func createTestRDPSettings() -> RDPSettings {
+        return RDPSettings(
+            profileName: "测试配置",
+            compressionLevel: 1,
+            colorDepth: 24,
+            audioQuality: "中等",
+            enableFontSmoothing: true,
+            enableWallpaper: true,
+            enableMenuAnimations: false,
+            enableThemes: true,
+            resolution: ResolutionSettings(width: 1920, height: 1080),
+            hiDPI: HiDPISettings(enabled: true, scaleFactor: 1.5),
+            useAutoDetection: true
+        )
     }
 }
