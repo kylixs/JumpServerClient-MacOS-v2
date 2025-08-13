@@ -90,6 +90,11 @@ public class RDPSettingsViewController: NSViewController {
     public override func viewDidLoad() {
         super.viewDidLoad()
         updateStatusLabel("就绪")
+        
+        // 在UI完全初始化后检测显示器
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshDisplays(nil)
+        }
     }
     
     // MARK: - UI设置
@@ -153,8 +158,7 @@ public class RDPSettingsViewController: NSViewController {
         recommendationLabel.frame = NSRect(x: 370, y: 5, width: 160, height: 15)
         displayInfoPanel.addSubview(recommendationLabel)
         
-        // 初始化显示器检测
-        refreshDisplays(nil)
+        // 注意：不在这里调用refreshDisplays，而是在viewDidLoad中调用
     }
     
     private func setupTitleAndProfile() {
@@ -531,6 +535,12 @@ public class RDPSettingsViewController: NSViewController {
     // MARK: - 显示器管理辅助方法
     
     private func updateDisplaySelectionMenu() {
+        // 确保UI组件已经初始化
+        guard let displaySelectionPopup = displaySelectionPopup else {
+            print("⚠️ 显示器选择菜单尚未初始化，跳过更新")
+            return
+        }
+        
         displaySelectionPopup.removeAllItems()
         
         for (_, display) in allDisplays.enumerated() {
@@ -547,7 +557,7 @@ public class RDPSettingsViewController: NSViewController {
             updateDisplayInfo(mainDisplay)
             
             // 如果启用自动检测，应用主显示器配置
-            if autoDetectionCheckbox.state == .on {
+            if let autoDetectionCheckbox = autoDetectionCheckbox, autoDetectionCheckbox.state == .on {
                 applyDisplayConfiguration(mainDisplay)
             }
         }
@@ -563,6 +573,14 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateDisplayInfo(_ display: DisplayConfiguration) {
+        // 确保UI组件已经初始化
+        guard let displayNameLabel = displayNameLabel,
+              let displaySpecsLabel = displaySpecsLabel,
+              let recommendationLabel = recommendationLabel else {
+            print("⚠️ 显示器信息UI组件尚未初始化，跳过更新")
+            return
+        }
+        
         // 更新显示器名称
         displayNameLabel.stringValue = getDisplayName(for: display)
         
@@ -933,6 +951,11 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateStatusLabel(_ message: String) {
+        // 确保statusLabel已经初始化
+        guard let statusLabel = statusLabel else {
+            print("⚠️ statusLabel尚未初始化，跳过状态更新: \(message)")
+            return
+        }
         statusLabel.stringValue = "状态: \(message)"
     }
     
