@@ -167,7 +167,7 @@
 5. WHEN 发现UI问题或测试失败 THEN 系统 SHALL 记录具体错误信息、失败原因和修复建议
 ### Requirement 11
 
-**User Story:** 作为用户，我希望在RDP设置界面中能够手动配置分辨率和HiDPI选项，这样我就能根据不同的使用场景和网络条件自定义最适合的显示设置。
+**User Story:** 作为用户，我希望在RDP设置界面中能够手动配置分辨率和HiDPI选项，包括多显示器支持和精确的缩放因子控制，这样我就能根据不同的使用场景、网络条件和显示器环境自定义最适合的显示设置。
 
 #### Acceptance Criteria - 分辨率设置选项
 
@@ -180,31 +180,70 @@
 3. WHEN 用户选择"自定义分辨率" THEN 系统 SHALL 显示宽度和高度输入框
 4. WHEN 用户输入自定义分辨率 THEN 系统 SHALL 验证输入值的有效性（范围：800×600 到 7680×4320）
 5. WHEN 分辨率设置变更 THEN 系统 SHALL 实时显示预计的显示效果和带宽需求
-6. WHEN 用户点击"自动检测" THEN 系统 SHALL 检测当前显示器分辨率并自动填入
+6. WHEN 用户点击"自动检测" THEN 系统 SHALL 检测当前选定显示器的分辨率并自动填入
+
+#### Acceptance Criteria - 多显示器支持
+
+1. WHEN RDP设置界面加载 THEN 系统 SHALL 自动检测所有连接的显示器并显示显示器列表
+2. WHEN 检测到多个显示器 THEN 系统 SHALL 提供显示器选择下拉菜单，包含以下信息：
+   - 显示器编号和名称（如：显示器1 - 内置Retina显示器）
+   - 显示器分辨率和类型（如：3024×1964 HiDPI）
+   - 当前缩放设置（如：缩放 2.0x）
+3. WHEN 用户选择不同的显示器 THEN 系统 SHALL 自动执行以下操作：
+   - 更新分辨率设置为该显示器的原生分辨率
+   - 自动设置该显示器的HiDPI缩放因子
+   - 更新显示器信息显示
+   - 刷新推荐配置
+4. WHEN 显示器配置发生变化（连接/断开显示器）THEN 系统 SHALL 自动重新检测并更新显示器列表
+5. WHEN 用户点击"刷新显示器" THEN 系统 SHALL 重新扫描所有显示器并更新列表
 
 #### Acceptance Criteria - HiDPI/缩放设置选项
 
 1. WHEN 打开RDP设置界面 THEN 系统 SHALL 显示HiDPI和缩放配置选项
 2. WHEN 用户查看HiDPI选项 THEN 系统 SHALL 提供以下设置：
    - HiDPI支持开关（启用/禁用）
-   - 缩放因子选择（100%, 125%, 150%, 175%, 200%, 自定义）
+   - 预设缩放因子选择（100%, 125%, 150%, 175%, 200%, 250%, 300%）
+   - 自定义缩放因子输入框（支持精确到0.01的小数值）
    - DPI感知模式（系统DPI感知/每显示器DPI感知/DPI不感知）
-3. WHEN 检测到Retina显示器 THEN 系统 SHALL 默认启用HiDPI支持并推荐合适的缩放因子
-4. WHEN 用户启用HiDPI支持 THEN 系统 SHALL 显示相关的高级选项（字体平滑、子像素渲染等）
-5. WHEN HiDPI设置变更 THEN 系统 SHALL 自动调整相关的RDP参数（desktopscalefactor等）
+3. WHEN 用户选择"自定义缩放因子" THEN 系统 SHALL 显示数值输入框，支持以下功能：
+   - 输入范围：0.50 到 5.00
+   - 精度：支持两位小数（如：1.25, 2.33）
+   - 实时验证：输入时即时验证数值有效性
+   - 智能建议：根据显示器DPI提供推荐值
+4. WHEN 检测到Retina显示器 THEN 系统 SHALL 默认启用HiDPI支持并推荐合适的缩放因子
+5. WHEN 用户启用HiDPI支持 THEN 系统 SHALL 显示相关的高级选项（字体平滑、子像素渲染等）
+6. WHEN HiDPI设置变更 THEN 系统 SHALL 自动调整相关的RDP参数（desktopscalefactor等）
+7. WHEN 用户输入自定义缩放因子 THEN 系统 SHALL 实时显示以下信息：
+   - 等效百分比（如：1.25 = 125%）
+   - 预计显示效果（如：文字大小、界面缩放）
+   - 兼容性提示（如：推荐用于高DPI显示器）
 
 #### Acceptance Criteria - 显示器检测和推荐
 
 1. WHEN RDP设置界面加载 THEN 系统 SHALL 自动检测当前显示器配置并显示检测结果
 2. WHEN 显示器检测完成 THEN 系统 SHALL 显示以下信息：
-   - 当前显示器分辨率和DPI
+   - 当前选定显示器的分辨率和DPI
    - 是否为HiDPI显示器
    - 当前系统缩放设置
    - 推荐的RDP配置
 3. WHEN 用户点击"应用推荐设置" THEN 系统 SHALL 自动配置最优的分辨率和HiDPI参数
 4. WHEN 检测到多显示器 THEN 系统 SHALL 显示所有显示器信息并允许用户选择目标显示器
 5. WHEN 显示器配置发生变化 THEN 系统 SHALL 提供"重新检测"按钮更新显示器信息
+6. WHEN 用户切换显示器选择 THEN 系统 SHALL 自动应用该显示器的最佳配置
 
+#### Acceptance Criteria - 智能配置建议
+
+1. WHEN 系统检测到不同类型的显示器 THEN 系统 SHALL 提供相应的配置建议：
+   - 内置Retina显示器：推荐2.0x缩放，启用HiDPI
+   - 外接4K显示器：推荐1.5x-2.0x缩放，根据尺寸调整
+   - 标准1080p显示器：推荐1.0x缩放，禁用HiDPI
+   - 超宽显示器：推荐原生分辨率，1.0x-1.25x缩放
+2. WHEN 用户选择不同的显示器 THEN 系统 SHALL 自动更新配置建议
+3. WHEN 检测到显示器DPI THEN 系统 SHALL 计算并推荐最佳缩放因子：
+   - DPI < 120：推荐1.0x缩放
+   - DPI 120-150：推荐1.25x缩放
+   - DPI 150-200：推荐1.5x缩放
+   - DPI > 200：推荐2.0x或更高缩放
 
 #### Acceptance Criteria - 高级显示选项
 
@@ -217,6 +256,16 @@
 3. WHEN 用户选择"性能优先" THEN 系统 SHALL 自动配置低延迟、高压缩的参数组合
 4. WHEN 用户选择"质量优先" THEN 系统 SHALL 自动配置高质量、低压缩的参数组合
 5. WHEN 用户选择"平衡模式" THEN 系统 SHALL 自动配置性能和质量平衡的参数组合
+
+#### Acceptance Criteria - 用户体验优化
+
+1. WHEN 用户进行任何显示器或缩放设置变更 THEN 系统 SHALL 提供实时预览功能：
+   - 显示预计的桌面大小
+   - 显示文字和界面元素的相对大小
+   - 显示带宽需求变化
+2. WHEN 用户输入无效的缩放因子 THEN 系统 SHALL 显示友好的错误提示和建议值
+3. WHEN 系统检测到潜在的兼容性问题 THEN 系统 SHALL 显示警告信息和解决建议
+4. WHEN 用户保存设置 THEN 系统 SHALL 验证所有参数的兼容性并提供确认对话框
 
 ### Requirement 12
 
