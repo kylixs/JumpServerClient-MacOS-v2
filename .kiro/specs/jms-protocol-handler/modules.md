@@ -6,28 +6,22 @@
 
 ```mermaid
 graph TD
-    A[JMSProtocolHandler - 主应用程序] --> B[JMSCore - 核心模块]
-    A --> C[JMSServices - 服务模块]
-    A --> D[JMSRDPModule - RDP模块]
-    A --> E[JMSSSHModule - SSH模块]
-    A --> F[JMSGUIValidation - GUI验证工具]
+    A[JMSProtocolHandler - 主应用程序] --> B[JMSCore - 核心服务模块]
+    A --> C[JMSRDPModule - RDP模块]
+    A --> D[JMSSSHModule - SSH模块]
     
     C --> B
     D --> B
-    D --> C
-    D --> F
-    E --> B
-    E --> C
 ```
 
 ## 模块详细定义
 
-### 1. JMSCore - 核心模块
+### 1. JMSCore - 核心服务模块 (合并后)
 
 **职责：**
 - 定义核心数据模型
-- 提供基础错误处理
-- 定义关键业务协议（仅限核心抽象）
+- 实现基础服务功能：URL解析、数据解码、错误处理
+- 提供通用工具和系统集成服务
 
 **主要组件：**
 - **数据模型 (Models/)**
@@ -37,14 +31,16 @@ graph TD
   - `JMSConfig.swift` - 配置信息结构
   - `DisplayConfiguration.swift` - 显示器配置结构
 
-- **核心协议 (Protocols/)** - 仅保留必要的抽象
-  - `URLParserProtocol.swift` - URL解析协议
-  - `ConnectionInfoExtractorProtocol.swift` - 连接信息提取协议
-  - `ErrorHandlerProtocol.swift` - 错误处理协议
+- **服务实现 (Services/)**
+  - `URLParser.swift` - URL解析服务
+  - `PayloadDecoder.swift` - Base64解码和JSON解析
+  - `ConnectionInfoExtractor.swift` - 连接信息提取
+  - `ErrorHandler.swift` - 统一错误处理
+  - `NotificationManager.swift` - 用户通知管理
 
 **依赖关系：**
 - 无外部依赖（基础模块）
-- 依赖系统框架：Foundation, CoreGraphics
+- 依赖系统框架：Foundation, CoreGraphics, Cocoa
 
 **导出接口：**
 ```swift
@@ -57,75 +53,69 @@ public struct JMSURLComponents
 public struct JMSConfig
 public struct DisplayConfiguration
 
-// 核心协议（仅必要抽象）
-public protocol URLParserProtocol
-public protocol ConnectionInfoExtractorProtocol
-public protocol ErrorHandlerProtocol
-```
-
-### 2. JMSServices - 服务模块
-
-**职责：**
-- 实现通用服务功能
-- 提供URL解析、数据解码、错误处理等基础服务
-- 管理用户通知和系统集成
-
-**主要组件：**
-- `URLParser.swift` - URL解析实现
-- `PayloadDecoder.swift` - Base64解码和JSON解析
-- `ConnectionInfoExtractor.swift` - 连接信息提取
-- `ErrorHandler.swift` - 统一错误处理
-- `NotificationManager.swift` - 用户通知管理
-
-**依赖关系：**
-- 依赖：JMSCore
-- 依赖系统框架：Foundation, Cocoa
-
-**导出接口：**
-```swift
-public class URLParser: URLParserProtocol
-public class ConnectionInfoExtractor: ConnectionInfoExtractorProtocol
-public class ErrorHandler: ErrorHandlerProtocol
+// 服务实现类 (直接实现，无需协议抽象)
+public class URLParser
+public class ConnectionInfoExtractor
+public class ErrorHandler
 public class PayloadDecoder
 public class NotificationManager
 ```
 
-### 3. JMSRDPModule - RDP模块
+### 2. JMSRDPModule - RDP模块
 
 **职责：**
 - 处理RDP协议相关功能
-- 实现显示器检测和配置优化（直接实现，无需协议抽象）
-- 管理RDP质量配置和用户界面
+- 实现显示器检测和RDP配置管理
+- 管理RDP用户界面和高级设置
 - 集成Microsoft Remote Desktop
 
 **主要组件：**
 - **RDP设置 (RDPSettings/)**
   - `RDPSettingsModel.swift` - RDP设置数据模型
-  - `RDPSettingsManager.swift` - RDP设置管理器
   - `RDPSettingsViewController.swift` - RDP设置界面控制器
+  - `RDPDisplayConfigurationView.swift` - 分辨率和HiDPI配置界面 🆕
+  - `RDPAdvancedOptionsView.swift` - 高级显示选项界面 🆕
+  - `RDPConfigurationTemplateManager.swift` - 配置模板管理器 🆕
+
+- **显示配置管理 (DisplayConfiguration/)**
+  - `DisplayResolutionManager.swift` - 分辨率管理器 🆕
+  - `HiDPIConfigurationManager.swift` - HiDPI配置管理器 🆕
+  - `DisplayPreviewGenerator.swift` - 显示配置预览生成器 🆕
+  - `DisplayCompatibilityValidator.swift` - 显示兼容性验证器 🆕
+
+- **配置导入导出 (ConfigurationIO/)**
+  - `RDPConfigurationExporter.swift` - RDP配置导出器 🆕
+  - `RDPConfigurationImporter.swift` - RDP配置导入器 🆕
+  - `ConfigurationTemplateStorage.swift` - 配置模板存储管理 🆕
 
 - **服务实现 (Services/)**
   - `RemoteDesktopIntegrator.swift` - Remote Desktop集成
   - `DisplayDetector.swift` - 显示器检测实现
-  - `RDPConfigOptimizer.swift` - RDP配置优化器（直接实现类）
-  - `RDPQualityConfigManager.swift` - RDP质量配置管理
-  - `RDPQualityConfigViewController.swift` - 质量配置界面
+  - `RDPConfigManager.swift` - RDP配置管理器（合并优化和质量管理功能）
 
 **依赖关系：**
-- 依赖：JMSCore, JMSServices, JMSGUIValidation（用于界面验证）
+- 依赖：JMSCore
 - 依赖系统框架：Foundation, Cocoa, CoreGraphics
 
 **导出接口：**
 ```swift
 public class RemoteDesktopIntegrator
 public class DisplayDetector
-public class RDPConfigOptimizer  // 直接实现类，无需协议
-public class RDPSettingsManager
+public class RDPConfigManager  // 统一的配置管理器
 public class RDPSettingsViewController
-public class RDPQualityConfigManager
+
+// 新增的显示配置相关接口 🆕
+public class RDPDisplayConfigurationView
+public class RDPAdvancedOptionsView
+public class DisplayResolutionManager
+public class HiDPIConfigurationManager
+public class DisplayPreviewGenerator
+public class RDPConfigurationTemplateManager
+public class RDPConfigurationExporter
+public class RDPConfigurationImporter
 ```
 
-### 4. JMSSSHModule - SSH模块
+### 3. JMSSSHModule - SSH模块
 
 **职责：**
 - 处理SSH协议相关功能
@@ -136,7 +126,7 @@ public class RDPQualityConfigManager
 - `SSHTerminalIntegrator.swift` - SSH终端集成实现
 
 **依赖关系：**
-- 依赖：JMSCore, JMSServices
+- 依赖：JMSCore
 - 依赖系统框架：Foundation, Cocoa
 
 **导出接口：**
@@ -171,7 +161,7 @@ public class ValidationReportGenerator
 public class ComponentHierarchyAnalyzer
 ```
 
-### 6. JMSProtocolHandler - 主应用程序
+### 4. JMSProtocolHandler - 主应用程序
 
 **职责：**
 - 应用程序入口和生命周期管理
@@ -185,84 +175,5 @@ public class ComponentHierarchyAnalyzer
 - `Resources/` - 资源文件（Info.plist, Assets, XIB等）
 
 **依赖关系：**
-- 依赖：JMSCore, JMSServices, JMSRDPModule, JMSSSHModule
+- 依赖：JMSCore, JMSRDPModule, JMSSSHModule
 - 依赖系统框架：Foundation, Cocoa
-
-## 设计调整说明
-
-### 1. GUI验证模块重新定位
-- **调整前**：GUI验证模块依赖RDP模块
-- **调整后**：GUI验证作为基础工具模块，RDP模块在需要时使用GUI验证工具
-- **优势**：GUI验证工具可以被任何需要界面验证的模块使用，提高复用性
-
-### 2. Core模块精简
-- **调整前**：Core模块包含大量协议定义
-- **调整后**：仅保留核心数据模型和必要的抽象协议
-- **移除的协议**：
-  - `PayloadDecoderProtocol` - 解码功能相对简单，直接实现即可
-  - `NotificationManagerProtocol` - 通知管理功能稳定，无需抽象
-  - `DisplayDetectorProtocol` - 显示器检测是具体实现，无需协议
-  - `RDPConfigOptimizerProtocol` - RDP配置优化是具体业务逻辑，无需抽象
-  - `RemoteDesktopIntegratorProtocol` - 与外部应用集成，具体实现更合适
-  - `SSHTerminalIntegratorProtocol` - SSH集成是具体实现
-  - `RDPQualityConfigManagerProtocol` - 质量配置管理是具体业务
-  - `ConfigurationViewControllerProtocol` - UI控制器无需协议抽象
-
-### 3. 保留的核心协议及理由
-- `URLParserProtocol` - URL解析可能有多种实现方式，需要抽象
-- `ConnectionInfoExtractorProtocol` - 连接信息提取逻辑可能扩展，需要抽象
-- `ErrorHandlerProtocol` - 错误处理策略可能变化，需要抽象
-
-## 模块间通信机制
-
-### 1. 简化的依赖关系
-```
-JMSProtocolHandler
-├── JMSCore (基础数据和核心协议)
-├── JMSServices (通用服务实现)
-├── JMSRDPModule (RDP业务逻辑)
-│   └── 使用 JMSGUIValidation (界面验证)
-└── JMSSSHModule (SSH业务逻辑)
-```
-
-### 2. 数据流向
-```
-URL输入 → JMSServices(解析) → JMSCore(数据模型) → 
-RDP: JMSRDPModule(处理) → Microsoft Remote Desktop
-SSH: JMSSSHModule(处理) → Terminal/iTerm2
-```
-
-### 3. GUI验证使用流程
-```
-RDPQualityConfigViewController → JMSGUIValidation(验证工具) → 验证报告
-```
-
-## 模块构建顺序
-
-基于调整后的依赖关系：
-
-1. **JMSCore** - 基础模块，无依赖
-2. **JMSGUIValidation** - 基础工具模块，仅依赖JMSCore
-3. **JMSServices** - 依赖JMSCore
-4. **JMSRDPModule** - 依赖JMSCore、JMSServices、JMSGUIValidation
-5. **JMSSSHModule** - 依赖JMSCore、JMSServices
-6. **JMSProtocolHandler** - 主应用程序，依赖所有模块
-
-## 优化后的优势
-
-### 1. 更清晰的职责分离
-- Core模块专注于核心数据和必要抽象
-- GUI验证作为独立工具，可复用性更强
-- 业务模块专注于具体实现，减少过度抽象
-
-### 2. 更好的可维护性
-- 减少不必要的协议层，降低复杂度
-- GUI验证工具独立，便于测试和维护
-- 依赖关系更加清晰和合理
-
-### 3. 更高的开发效率
-- 避免过度设计，专注于实际需求
-- 模块间耦合度降低，并行开发更容易
-- 测试策略更加直接和有效
-
-这种调整后的模块划分更符合实际开发需求，避免了过度抽象，同时保持了良好的模块化设计。

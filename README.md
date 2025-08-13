@@ -159,17 +159,39 @@ jumpserver-client/
 ## 🔧 开发
 
 ### 构建项目
+
+#### 🚀 快速构建（推荐）
 ```bash
-# 配置构建路径（首次运行）
-./scripts/build/configure-build-paths.sh
+# 交互式构建 - 选择构建类型
+./build.sh
 
-# 使用自定义路径构建
-./scripts/build/build-with-custom-paths.sh
+# 直接指定构建类型
+./build.sh full                    # 完整构建
+./build.sh --clean --test          # 清理后构建并测试
+./build.sh --package               # 构建并创建安装包
+```
 
-# 或使用传统方式构建
+#### 🔧 高级构建选项
+```bash
+# 使用统一构建脚本
+./scripts/build/unified-build.sh --help          # 查看所有选项
+./scripts/build/unified-build.sh swift-only     # 仅Swift Package构建
+./scripts/build/unified-build.sh xcode-only     # 仅Xcode项目构建
+./scripts/build/unified-build.sh --verbose full # 详细输出的完整构建
+
+# 传统方式构建
 cd JMSProtocolHandler
 xcodebuild -project JMSProtocolHandler.xcodeproj -scheme JMSProtocolHandler -configuration Release build
 ```
+
+#### 📋 构建脚本功能
+- ✅ **统一构建系统**: 整合Swift Package和Xcode项目构建
+- ✅ **智能目录管理**: 自动创建和管理构建目录结构
+- ✅ **多种构建模式**: 支持完整/Swift-only/Xcode-only构建
+- ✅ **集成测试**: 自动运行67个测试用例验证构建质量
+- ✅ **安装包创建**: 一键生成DMG和PKG安装包
+- ✅ **交互式界面**: 用户友好的构建选项选择
+- ✅ **详细文档**: 完整的构建脚本使用说明
 
 ### 运行测试
 ```bash

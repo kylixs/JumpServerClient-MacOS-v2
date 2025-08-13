@@ -165,4 +165,92 @@
 3. WHEN 验证RDP设置界面 THEN 系统 SHALL 检查设置选项和控件的正确性
 4. WHEN 运行单元测试 THEN 系统 SHALL 包含完整的GUI验证自动化测试用例并生成详细验证报告
 5. WHEN 发现UI问题或测试失败 THEN 系统 SHALL 记录具体错误信息、失败原因和修复建议
-6. WHEN 测试通过 THEN 系统 SHALL 确认GUI界面符合设计要求和用户体验标准
+### Requirement 11
+
+**User Story:** 作为用户，我希望在RDP设置界面中能够手动配置分辨率和HiDPI选项，这样我就能根据不同的使用场景和网络条件自定义最适合的显示设置。
+
+#### Acceptance Criteria - 分辨率设置选项
+
+1. WHEN 打开RDP设置界面 THEN 系统 SHALL 显示分辨率配置选项区域
+2. WHEN 用户查看分辨率选项 THEN 系统 SHALL 提供以下预设分辨率选择：
+   - 1920×1080 (Full HD)
+   - 2560×1440 (2K)
+   - 3840×2160 (4K)
+   - 自定义分辨率
+3. WHEN 用户选择"自定义分辨率" THEN 系统 SHALL 显示宽度和高度输入框
+4. WHEN 用户输入自定义分辨率 THEN 系统 SHALL 验证输入值的有效性（范围：800×600 到 7680×4320）
+5. WHEN 分辨率设置变更 THEN 系统 SHALL 实时显示预计的显示效果和带宽需求
+6. WHEN 用户点击"自动检测" THEN 系统 SHALL 检测当前显示器分辨率并自动填入
+
+#### Acceptance Criteria - HiDPI/缩放设置选项
+
+1. WHEN 打开RDP设置界面 THEN 系统 SHALL 显示HiDPI和缩放配置选项
+2. WHEN 用户查看HiDPI选项 THEN 系统 SHALL 提供以下设置：
+   - HiDPI支持开关（启用/禁用）
+   - 缩放因子选择（100%, 125%, 150%, 175%, 200%, 自定义）
+   - DPI感知模式（系统DPI感知/每显示器DPI感知/DPI不感知）
+3. WHEN 检测到Retina显示器 THEN 系统 SHALL 默认启用HiDPI支持并推荐合适的缩放因子
+4. WHEN 用户启用HiDPI支持 THEN 系统 SHALL 显示相关的高级选项（字体平滑、子像素渲染等）
+5. WHEN 用户调整缩放因子 THEN 系统 SHALL 显示预览效果和性能影响提示
+6. WHEN HiDPI设置变更 THEN 系统 SHALL 自动调整相关的RDP参数（desktopscalefactor等）
+
+#### Acceptance Criteria - 显示器检测和推荐
+
+1. WHEN RDP设置界面加载 THEN 系统 SHALL 自动检测当前显示器配置并显示检测结果
+2. WHEN 显示器检测完成 THEN 系统 SHALL 显示以下信息：
+   - 当前显示器分辨率和DPI
+   - 是否为HiDPI显示器
+   - 当前系统缩放设置
+   - 推荐的RDP配置
+3. WHEN 用户点击"应用推荐设置" THEN 系统 SHALL 自动配置最优的分辨率和HiDPI参数
+4. WHEN 检测到多显示器 THEN 系统 SHALL 显示所有显示器信息并允许用户选择目标显示器
+5. WHEN 显示器配置发生变化 THEN 系统 SHALL 提供"重新检测"按钮更新显示器信息
+
+#### Acceptance Criteria - 配置预览和验证
+
+1. WHEN 用户修改分辨率或HiDPI设置 THEN 系统 SHALL 实时显示配置预览
+2. WHEN 显示配置预览 THEN 系统 SHALL 包含以下信息：
+   - 预计的显示效果（清晰度评级）
+   - 网络带宽需求估算
+   - 性能影响评估（低/中/高）
+   - 兼容性提示
+3. WHEN 用户应用设置 THEN 系统 SHALL 验证配置的有效性和兼容性
+4. WHEN 配置验证失败 THEN 系统 SHALL 显示具体的错误信息和修复建议
+5. WHEN 配置验证成功 THEN 系统 SHALL 保存设置并更新RDP配置文件
+
+#### Acceptance Criteria - 高级显示选项
+
+1. WHEN 用户展开高级选项 THEN 系统 SHALL 显示以下额外设置：
+   - 颜色深度选择（16位/24位/32位）
+   - 刷新率设置（30Hz/60Hz/自动）
+   - 压缩级别（无压缩/低/中/高）
+   - 显示优化选项（性能优先/平衡/质量优先）
+2. WHEN 用户修改高级选项 THEN 系统 SHALL 显示每个选项对性能和质量的影响
+3. WHEN 用户选择"性能优先" THEN 系统 SHALL 自动配置低延迟、高压缩的参数组合
+4. WHEN 用户选择"质量优先" THEN 系统 SHALL 自动配置高质量、低压缩的参数组合
+5. WHEN 用户选择"平衡模式" THEN 系统 SHALL 自动配置性能和质量平衡的参数组合
+
+### Requirement 12
+
+**User Story:** 作为系统管理员，我希望RDP设置界面能够提供配置导入导出功能，这样我就能在多台设备间共享配置或为不同用户场景创建配置模板。
+
+#### Acceptance Criteria - 配置管理功能
+
+1. WHEN 用户在RDP设置界面中 THEN 系统 SHALL 提供"导出配置"和"导入配置"按钮
+2. WHEN 用户点击"导出配置" THEN 系统 SHALL 将当前所有RDP设置（包括分辨率、HiDPI、高级选项）保存为JSON文件
+3. WHEN 用户点击"导入配置" THEN 系统 SHALL 允许用户选择配置文件并加载设置
+4. WHEN 导入配置文件 THEN 系统 SHALL 验证文件格式和参数有效性
+5. WHEN 配置导入成功 THEN 系统 SHALL 更新界面显示并应用新的设置
+6. WHEN 配置导入失败 THEN 系统 SHALL 显示详细的错误信息和修复建议
+
+#### Acceptance Criteria - 配置模板和预设
+
+1. WHEN RDP设置界面加载 THEN 系统 SHALL 提供内置的配置模板选择
+2. WHEN 用户查看配置模板 THEN 系统 SHALL 提供以下预设模板：
+   - "办公环境" - 平衡性能和质量，适合日常办公
+   - "设计工作" - 高质量显示，适合图形设计工作
+   - "移动网络" - 低带宽优化，适合移动网络环境
+   - "高性能" - 最大性能优化，适合游戏或实时应用
+3. WHEN 用户选择配置模板 THEN 系统 SHALL 自动应用相应的分辨率、HiDPI和高级参数设置
+4. WHEN 用户修改模板设置 THEN 系统 SHALL 允许用户保存为自定义模板
+5. WHEN 用户创建自定义模板 THEN 系统 SHALL 允许用户命名并保存配置供后续使用
