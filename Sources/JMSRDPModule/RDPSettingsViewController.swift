@@ -44,7 +44,7 @@ public class RDPSettingsViewController: NSViewController {
     private var scaleFactorLabel: NSTextField!
     private var autoDetectionCheckbox: NSButton!
     private var displayInfoLabel: NSTextField!
-    private var previewTextView: NSTextView!
+    private var bandwidthLabel: NSTextField!
     private var displayDetector = DisplayDetector()
     
     // MARK: - 初始化
@@ -59,7 +59,7 @@ public class RDPSettingsViewController: NSViewController {
     // MARK: - 生命周期
     public override func loadView() {
         print("📱 加载RDP设置界面...")
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 650))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 650))
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
@@ -82,7 +82,6 @@ public class RDPSettingsViewController: NSViewController {
         setupCompressionControls()
         setupQualityControls()
         setupEffectControls()
-        setupPreviewArea()
         setupActionButtons()
         setupStatusLabel()
     }
@@ -173,6 +172,12 @@ public class RDPSettingsViewController: NSViewController {
         displayInfoLabel.textColor = NSColor.secondaryLabelColor
         view.addSubview(displayInfoLabel)
         
+        // 带宽需求显示
+        bandwidthLabel = NSTextField(labelWithString: "预计带宽: 5-10 Mbps")
+        bandwidthLabel.frame = NSRect(x: 20, y: 410, width: 200, height: 20)
+        bandwidthLabel.textColor = NSColor.secondaryLabelColor
+        view.addSubview(bandwidthLabel)
+        
         // 检测当前显示器信息
         detectCurrentDisplay()
     }
@@ -181,18 +186,18 @@ public class RDPSettingsViewController: NSViewController {
         // HiDPI设置区域标题
         let hiDPISectionLabel = NSTextField(labelWithString: "HiDPI/缩放设置")
         hiDPISectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        hiDPISectionLabel.frame = NSRect(x: 20, y: 400, width: 150, height: 20)
+        hiDPISectionLabel.frame = NSRect(x: 20, y: 370, width: 150, height: 20)
         view.addSubview(hiDPISectionLabel)
         
         // HiDPI启用选项
         hiDPICheckbox = NSButton(checkboxWithTitle: "启用HiDPI优化", target: self, action: #selector(hiDPISettingChanged(_:)))
-        hiDPICheckbox.frame = NSRect(x: 20, y: 370, width: 150, height: 20)
+        hiDPICheckbox.frame = NSRect(x: 20, y: 340, width: 150, height: 20)
         hiDPICheckbox.state = .off
         view.addSubview(hiDPICheckbox)
         
         // 缩放因子设置
         let scaleLabel = NSTextField(labelWithString: "缩放因子:")
-        scaleLabel.frame = NSRect(x: 20, y: 340, width: 80, height: 20)
+        scaleLabel.frame = NSRect(x: 20, y: 310, width: 80, height: 20)
         view.addSubview(scaleLabel)
         
         scaleFactorSlider = NSSlider()
@@ -203,17 +208,17 @@ public class RDPSettingsViewController: NSViewController {
         scaleFactorSlider.allowsTickMarkValuesOnly = true
         scaleFactorSlider.target = self
         scaleFactorSlider.action = #selector(scaleFactorChanged(_:))
-        scaleFactorSlider.frame = NSRect(x: 110, y: 340, width: 150, height: 25)
+        scaleFactorSlider.frame = NSRect(x: 110, y: 310, width: 150, height: 25)
         scaleFactorSlider.isEnabled = false
         view.addSubview(scaleFactorSlider)
         
         scaleFactorLabel = NSTextField(labelWithString: "100% (标准)")
-        scaleFactorLabel.frame = NSRect(x: 270, y: 340, width: 100, height: 20)
+        scaleFactorLabel.frame = NSRect(x: 270, y: 310, width: 100, height: 20)
         view.addSubview(scaleFactorLabel)
         
         // 自动检测选项
         autoDetectionCheckbox = NSButton(checkboxWithTitle: "自动检测显示器配置", target: self, action: #selector(autoDetectionChanged(_:)))
-        autoDetectionCheckbox.frame = NSRect(x: 20, y: 310, width: 180, height: 20)
+        autoDetectionCheckbox.frame = NSRect(x: 20, y: 280, width: 180, height: 20)
         autoDetectionCheckbox.state = .on
         view.addSubview(autoDetectionCheckbox)
     }
@@ -221,7 +226,7 @@ public class RDPSettingsViewController: NSViewController {
     private func setupCompressionControls() {
         // 压缩级别
         let compressionLabel = NSTextField(labelWithString: "压缩级别:")
-        compressionLabel.frame = NSRect(x: 20, y: 270, width: 80, height: 20)
+        compressionLabel.frame = NSRect(x: 20, y: 240, width: 80, height: 20)
         view.addSubview(compressionLabel)
         
         compressionSlider = NSSlider()
@@ -232,18 +237,18 @@ public class RDPSettingsViewController: NSViewController {
         compressionSlider.allowsTickMarkValuesOnly = true
         compressionSlider.target = self
         compressionSlider.action = #selector(compressionChanged(_:))
-        compressionSlider.frame = NSRect(x: 110, y: 270, width: 150, height: 25)
+        compressionSlider.frame = NSRect(x: 110, y: 240, width: 150, height: 25)
         view.addSubview(compressionSlider)
         
         compressionValueLabel = NSTextField(labelWithString: "中等")
-        compressionValueLabel.frame = NSRect(x: 270, y: 270, width: 80, height: 20)
+        compressionValueLabel.frame = NSRect(x: 270, y: 240, width: 80, height: 20)
         view.addSubview(compressionValueLabel)
     }
     
     private func setupQualityControls() {
         // 颜色深度
         let colorDepthLabel = NSTextField(labelWithString: "颜色深度:")
-        colorDepthLabel.frame = NSRect(x: 20, y: 230, width: 80, height: 20)
+        colorDepthLabel.frame = NSRect(x: 20, y: 200, width: 80, height: 20)
         view.addSubview(colorDepthLabel)
         
         colorDepthPopup = NSPopUpButton()
@@ -251,12 +256,12 @@ public class RDPSettingsViewController: NSViewController {
         colorDepthPopup.selectItem(at: 1)
         colorDepthPopup.target = self
         colorDepthPopup.action = #selector(qualityControlChanged(_:))
-        colorDepthPopup.frame = NSRect(x: 110, y: 230, width: 100, height: 25)
+        colorDepthPopup.frame = NSRect(x: 110, y: 200, width: 100, height: 25)
         view.addSubview(colorDepthPopup)
         
         // 音频质量
         let audioLabel = NSTextField(labelWithString: "音频质量:")
-        audioLabel.frame = NSRect(x: 220, y: 230, width: 80, height: 20)
+        audioLabel.frame = NSRect(x: 220, y: 200, width: 80, height: 20)
         view.addSubview(audioLabel)
         
         audioQualityPopup = NSPopUpButton()
@@ -264,54 +269,31 @@ public class RDPSettingsViewController: NSViewController {
         audioQualityPopup.selectItem(at: 2)
         audioQualityPopup.target = self
         audioQualityPopup.action = #selector(qualityControlChanged(_:))
-        audioQualityPopup.frame = NSRect(x: 310, y: 230, width: 100, height: 25)
+        audioQualityPopup.frame = NSRect(x: 310, y: 200, width: 100, height: 25)
         view.addSubview(audioQualityPopup)
     }
     
     private func setupEffectControls() {
         // 特效选项
         fontSmoothingCheckbox = NSButton(checkboxWithTitle: "字体平滑", target: self, action: #selector(effectControlChanged(_:)))
-        fontSmoothingCheckbox.frame = NSRect(x: 20, y: 190, width: 100, height: 20)
+        fontSmoothingCheckbox.frame = NSRect(x: 20, y: 160, width: 100, height: 20)
         fontSmoothingCheckbox.state = .on
         view.addSubview(fontSmoothingCheckbox)
         
         wallpaperCheckbox = NSButton(checkboxWithTitle: "桌面壁纸", target: self, action: #selector(effectControlChanged(_:)))
-        wallpaperCheckbox.frame = NSRect(x: 130, y: 190, width: 100, height: 20)
+        wallpaperCheckbox.frame = NSRect(x: 130, y: 160, width: 100, height: 20)
         wallpaperCheckbox.state = .on
         view.addSubview(wallpaperCheckbox)
         
         animationsCheckbox = NSButton(checkboxWithTitle: "菜单动画", target: self, action: #selector(effectControlChanged(_:)))
-        animationsCheckbox.frame = NSRect(x: 20, y: 160, width: 100, height: 20)
+        animationsCheckbox.frame = NSRect(x: 20, y: 130, width: 100, height: 20)
         animationsCheckbox.state = .off
         view.addSubview(animationsCheckbox)
         
         themesCheckbox = NSButton(checkboxWithTitle: "视觉主题", target: self, action: #selector(effectControlChanged(_:)))
-        themesCheckbox.frame = NSRect(x: 130, y: 160, width: 100, height: 20)
+        themesCheckbox.frame = NSRect(x: 130, y: 130, width: 100, height: 20)
         themesCheckbox.state = .on
         view.addSubview(themesCheckbox)
-    }
-    
-    private func setupPreviewArea() {
-        // 预览区域标题
-        let previewLabel = NSTextField(labelWithString: "配置预览")
-        previewLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        previewLabel.frame = NSRect(x: 320, y: 530, width: 100, height: 20)
-        view.addSubview(previewLabel)
-        
-        // 预览文本区域
-        let scrollView = NSScrollView()
-        scrollView.frame = NSRect(x: 320, y: 160, width: 260, height: 360)
-        scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
-        
-        previewTextView = NSTextView()
-        previewTextView.isEditable = false
-        previewTextView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        previewTextView.textColor = NSColor.labelColor
-        previewTextView.backgroundColor = NSColor.controlBackgroundColor
-        
-        scrollView.documentView = previewTextView
-        view.addSubview(scrollView)
     }
     
     private func setupActionButtons() {
@@ -339,13 +321,13 @@ public class RDPSettingsViewController: NSViewController {
         // 应用推荐设置按钮
         let applyRecommendedButton = NSButton(title: "应用推荐设置", target: self, action: #selector(applyRecommendedSettings(_:)))
         applyRecommendedButton.bezelStyle = .rounded
-        applyRecommendedButton.frame = NSRect(x: 460, y: 80, width: 120, height: 30)
+        applyRecommendedButton.frame = NSRect(x: 250, y: 410, width: 120, height: 30)
         view.addSubview(applyRecommendedButton)
     }
     
     private func setupStatusLabel() {
         statusLabel = NSTextField(labelWithString: "状态: 就绪")
-        statusLabel.frame = NSRect(x: 20, y: 40, width: 560, height: 20)
+        statusLabel.frame = NSRect(x: 20, y: 40, width: 440, height: 20)
         statusLabel.textColor = NSColor.secondaryLabelColor
         view.addSubview(statusLabel)
     }
@@ -410,7 +392,7 @@ public class RDPSettingsViewController: NSViewController {
         scaleFactorSlider.isEnabled = config.isHiDPI
         updateScaleFactorLabel()
         
-        updatePreview()
+        updateBandwidthDisplay()
     }
     
     // MARK: - 新的事件处理方法
@@ -489,12 +471,12 @@ public class RDPSettingsViewController: NSViewController {
         let currentSettings = getCurrentSettingsFromUI()
         settingsManager.updateSettings(currentSettings)
         delegate?.settingsDidChange(currentSettings)
-        updatePreview()
+        updateBandwidthDisplay()
     }
     
-    private func updatePreview() {
+    private func updateBandwidthDisplay() {
         let currentSettings = getCurrentSettingsFromUI()
-        previewTextView.string = currentSettings.generatePreview()
+        bandwidthLabel.stringValue = "预计带宽: \(currentSettings.resolution.estimatedBandwidth)"
     }
     
     // MARK: - 数据管理
@@ -620,8 +602,8 @@ public class RDPSettingsViewController: NSViewController {
         animationsCheckbox.state = settings.enableMenuAnimations ? .on : .off
         themesCheckbox.state = settings.enableThemes ? .on : .off
         
-        // 更新预览
-        updatePreview()
+        // 更新带宽显示
+        updateBandwidthDisplay()
     }
     
     private func updateCompressionLabel() {

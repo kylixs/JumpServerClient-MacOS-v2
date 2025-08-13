@@ -122,18 +122,6 @@ class IntegrationTests: XCTestCase {
         XCTAssertTrue(rdpContent.contains("session bpp:i:24"))
     }
     
-    func testConfigurationPreview() {
-        // 测试配置预览生成
-        let settings = RDPSettings.balanced
-        let preview = settings.generatePreview()
-        
-        XCTAssertTrue(preview.contains("配置文件: 平衡模式"))
-        XCTAssertTrue(preview.contains("分辨率:"))
-        XCTAssertTrue(preview.contains("HiDPI:"))
-        XCTAssertTrue(preview.contains("清晰度评级:"))
-        XCTAssertTrue(preview.contains("预计带宽:"))
-    }
-    
     // MARK: - 显示器检测测试
     
     func testDisplayDetection() {
@@ -245,7 +233,6 @@ class IntegrationTests: XCTestCase {
         
         measure {
             _ = settings.generateRDPContent(server: "test.server.com", username: "testuser")
-            _ = settings.generatePreview()
         }
     }
     

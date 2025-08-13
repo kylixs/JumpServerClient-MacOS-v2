@@ -191,8 +191,7 @@
    - DPI感知模式（系统DPI感知/每显示器DPI感知/DPI不感知）
 3. WHEN 检测到Retina显示器 THEN 系统 SHALL 默认启用HiDPI支持并推荐合适的缩放因子
 4. WHEN 用户启用HiDPI支持 THEN 系统 SHALL 显示相关的高级选项（字体平滑、子像素渲染等）
-5. WHEN 用户调整缩放因子 THEN 系统 SHALL 显示预览效果和性能影响提示
-6. WHEN HiDPI设置变更 THEN 系统 SHALL 自动调整相关的RDP参数（desktopscalefactor等）
+5. WHEN HiDPI设置变更 THEN 系统 SHALL 自动调整相关的RDP参数（desktopscalefactor等）
 
 #### Acceptance Criteria - 显示器检测和推荐
 
@@ -206,17 +205,6 @@
 4. WHEN 检测到多显示器 THEN 系统 SHALL 显示所有显示器信息并允许用户选择目标显示器
 5. WHEN 显示器配置发生变化 THEN 系统 SHALL 提供"重新检测"按钮更新显示器信息
 
-#### Acceptance Criteria - 配置预览和验证
-
-1. WHEN 用户修改分辨率或HiDPI设置 THEN 系统 SHALL 实时显示配置预览
-2. WHEN 显示配置预览 THEN 系统 SHALL 包含以下信息：
-   - 预计的显示效果（清晰度评级）
-   - 网络带宽需求估算
-   - 性能影响评估（低/中/高）
-   - 兼容性提示
-3. WHEN 用户应用设置 THEN 系统 SHALL 验证配置的有效性和兼容性
-4. WHEN 配置验证失败 THEN 系统 SHALL 显示具体的错误信息和修复建议
-5. WHEN 配置验证成功 THEN 系统 SHALL 保存设置并更新RDP配置文件
 
 #### Acceptance Criteria - 高级显示选项
 

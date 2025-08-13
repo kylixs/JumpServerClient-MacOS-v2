@@ -95,19 +95,7 @@ class RDPSettingsViewControllerTests: XCTestCase {
         }
     }
     
-    // MARK: - 配置预览测试
-    
-    func testConfigurationPreview() {
-        // 测试配置预览生成
-        let settings = RDPSettings.balanced
-        let preview = settings.generatePreview()
-        
-        XCTAssertTrue(preview.contains("配置文件: 平衡模式"))
-        XCTAssertTrue(preview.contains("分辨率:"))
-        XCTAssertTrue(preview.contains("HiDPI:"))
-        XCTAssertTrue(preview.contains("清晰度评级:"))
-        XCTAssertTrue(preview.contains("预计带宽:"))
-    }
+    // MARK: - RDP配置生成测试
     
     func testRDPContentGeneration() {
         // 测试RDP配置文件内容生成
@@ -226,7 +214,6 @@ class RDPSettingsViewControllerTests: XCTestCase {
         
         measure {
             _ = settings.generateRDPContent(server: "test.server.com", username: "testuser")
-            _ = settings.generatePreview()
         }
     }
 }

@@ -232,24 +232,6 @@ final class JMSRDPModuleTests: XCTestCase {
         XCTAssertTrue(rdpContent.contains("session bpp:i:16"))
     }
     
-    // MARK: - Configuration Preview Tests
-    
-    func testConfigurationPreview() {
-        let settings = RDPSettings.balanced
-        let preview = settings.generatePreview()
-        
-        XCTAssertTrue(preview.contains("# RDP配置预览"))
-        XCTAssertTrue(preview.contains("配置文件: 平衡模式"))
-        XCTAssertTrue(preview.contains("显示设置:"))
-        XCTAssertTrue(preview.contains("分辨率:"))
-        XCTAssertTrue(preview.contains("HiDPI:"))
-        XCTAssertTrue(preview.contains("质量设置:"))
-        XCTAssertTrue(preview.contains("特效设置:"))
-        XCTAssertTrue(preview.contains("性能预估:"))
-        XCTAssertTrue(preview.contains("清晰度评级:"))
-        XCTAssertTrue(preview.contains("适用场景:"))
-    }
-    
     // MARK: - DisplayDetector Tests
     
     func testDisplayDetectorInitialization() {
@@ -337,14 +319,6 @@ final class JMSRDPModuleTests: XCTestCase {
         
         measure {
             _ = settings.generateRDPContent(server: "test.server.com", username: "testuser")
-        }
-    }
-    
-    func testPerformanceConfigurationPreview() {
-        let settings = RDPSettings.quality
-        
-        measure {
-            _ = settings.generatePreview()
         }
     }
     

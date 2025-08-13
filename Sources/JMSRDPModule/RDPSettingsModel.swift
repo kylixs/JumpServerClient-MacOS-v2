@@ -219,40 +219,6 @@ public struct RDPSettings: Codable {
         return content
     }
     
-    /// 生成配置预览文本
-    public func generatePreview() -> String {
-        return """
-        # RDP配置预览
-        
-        配置文件: \(profileName)
-        
-        显示设置:
-        分辨率: \(resolution.displayName)
-        HiDPI: \(hiDPI.enabled ? "启用 (\(hiDPI.scaleFactorDescription))" : "禁用")
-        自动检测: \(useAutoDetection ? "启用" : "禁用")
-        
-        质量设置:
-        压缩级别: \(compressionLevel == 0 ? "无压缩" : (compressionLevel == 1 ? "中等" : "高压缩"))
-        颜色深度: \(colorDepth)位
-        音频质量: \(audioQuality)
-        
-        特效设置:
-        \(enableFontSmoothing ? "✓" : "✗") 字体平滑
-        \(enableWallpaper ? "✓" : "✗") 桌面壁纸
-        \(enableMenuAnimations ? "✓" : "✗") 菜单动画
-        \(enableThemes ? "✓" : "✗") 视觉主题
-        
-        性能预估:
-        预计带宽: \(resolution.estimatedBandwidth)
-        清晰度评级: \(getClarityRating())
-        
-        适用场景:
-        \(getScenarioDescription())
-        
-        最后更新: \(getCurrentTimeString())
-        """
-    }
-    
     // MARK: - 私有方法
     
     private func getAudioMode() -> Int {
@@ -263,44 +229,6 @@ public struct RDPSettings: Codable {
         case "高质量": return 0
         default: return 0
         }
-    }
-    
-    private func getClarityRating() -> String {
-        let pixels = resolution.width * resolution.height
-        let hiDPIBonus = hiDPI.enabled ? 1 : 0
-        let colorBonus = colorDepth >= 24 ? 1 : 0
-        let compressionPenalty = compressionLevel
-        
-        let score = (pixels / 1000000) + hiDPIBonus + colorBonus - compressionPenalty
-        
-        switch score {
-        case ..<1:
-            return "基础 ⭐"
-        case 1..<3:
-            return "良好 ⭐⭐"
-        case 3..<5:
-            return "优秀 ⭐⭐⭐"
-        case 5..<8:
-            return "极佳 ⭐⭐⭐⭐"
-        default:
-            return "完美 ⭐⭐⭐⭐⭐"
-        }
-    }
-    
-    private func getScenarioDescription() -> String {
-        if compressionLevel == 2 && !enableWallpaper {
-            return "• 低带宽网络环境\n• 移动网络连接\n• 性能优先场景"
-        } else if compressionLevel == 0 && enableThemes {
-            return "• 高速网络环境\n• 设计和图形工作\n• 质量优先场景"
-        } else {
-            return "• 一般办公环境\n• 宽带网络连接\n• 平衡性能和质量"
-        }
-    }
-    
-    private func getCurrentTimeString() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter.string(from: Date())
     }
 }
 
