@@ -78,6 +78,7 @@
 2. WHEN 程序启动 THEN 系统 SHALL 在3秒内完成初始化
 3. WHEN 处理URL THEN 系统 SHALL 在1秒内完成解码和解析
 4. WHEN 启动Remote Desktop THEN 系统 SHALL 在5秒内完成应用程序启动
+
 ### Requirement 6
 
 **User Story:** 作为macOS用户，我希望程序能够智能选择和配置终端应用程序来建立SSH连接，支持多种终端工具并提供良好的用户体验。
@@ -147,72 +148,21 @@
 
 ### Requirement 10
 
-**User Story:** 作为经常使用RDP远程桌面的用户，我希望能够通过一个简单易用的配置入口来调整RDP连接的显示质量设置，这样我就能根据网络条件和使用需求快速切换不同的质量配置文件。
-
-#### Acceptance Criteria - 质量配置入口
-
-1. WHEN 用户首次启动应用程序 THEN 系统 SHALL 提供RDP质量配置的设置入口
-2. WHEN 用户访问质量配置入口 THEN 系统 SHALL 显示预设的质量配置文件选项（性能优先/平衡模式/质量优先）
-3. WHEN 用户选择"性能优先"配置 THEN 系统 SHALL 设置低压缩、标准分辨率、禁用特效的参数组合
-4. WHEN 用户选择"平衡模式"配置 THEN 系统 SHALL 设置中等压缩、自适应分辨率、部分特效的参数组合
-5. WHEN 用户选择"质量优先"配置 THEN 系统 SHALL 设置无压缩、最高分辨率、启用所有特效的参数组合
-
-#### Acceptance Criteria - 自定义配置支持
-
-1. WHEN 用户选择"自定义配置" THEN 系统 SHALL 提供详细的RDP参数调整界面
-2. WHEN 用户调整自定义参数 THEN 系统 SHALL 实时显示配置变更对性能和质量的影响预估
-3. WHEN 用户保存自定义配置 THEN 系统 SHALL 将配置持久化存储并应用到后续RDP连接
-4. WHEN 用户重置配置 THEN 系统 SHALL 恢复到基于显示器检测的智能默认配置
-5. WHEN 配置发生变更 THEN 系统 SHALL 在下次RDP连接时应用新的质量设置
-
-#### Acceptance Criteria - 配置管理和用户体验
-
-1. WHEN 用户访问配置入口 THEN 系统 SHALL 显示当前活跃的质量配置文件名称和关键参数
-2. WHEN 用户在不同网络环境下使用 THEN 系统 SHALL 提供快速切换质量配置的便捷方式
-3. WHEN 配置界面打开 THEN 系统 SHALL 显示每种配置对网络带宽和系统性能的要求说明
-4. WHEN 用户修改配置 THEN 系统 SHALL 提供配置预览功能，显示预期的连接效果
-5. WHEN 配置保存失败 THEN 系统 SHALL 显示具体的错误信息并提供修复建议
-
-### Requirement 11
-
-**User Story:** 作为开发者和测试人员，我希望能够自动验证RDP质量配置GUI界面的正确性，包括界面组件的层级结构、位置布局、内容显示等，这样我就能确保用户界面的质量和一致性。
+**User Story:** 作为开发者和测试人员，我希望能够自动验证RDP设置GUI界面的正确性，包括界面组件的层级结构、位置布局、内容显示等，这样我就能确保用户界面的质量和一致性。
 
 #### Acceptance Criteria - GUI组件层级树生成
 
-1. WHEN 启动RDP质量配置界面 THEN 系统 SHALL 能够生成完整的界面组件层级树
+1. WHEN 启动RDP设置界面 THEN 系统 SHALL 能够生成完整的界面组件层级树
 2. WHEN 生成组件层级树 THEN 系统 SHALL 包含每个组件的类型、位置、大小、zIndex等属性信息
 3. WHEN 组件层级树生成完成 THEN 系统 SHALL 包含所有控件的内容信息（文本、标签、状态等）
 4. WHEN 界面组件发生变化 THEN 系统 SHALL 能够检测并更新组件层级树信息
 5. WHEN 组件层级树导出 THEN 系统 SHALL 以结构化格式（JSON/XML）保存到临时文件
 
-#### Acceptance Criteria - 外部工具集成
-
-1. WHEN 使用外部工具进行GUI验证 THEN 系统 SHALL 支持通过命令行或API接口生成组件层级树
-2. WHEN 外部工具访问界面信息 THEN 系统 SHALL 提供标准化的界面元素访问接口
-3. WHEN 生成层级树数据 THEN 系统 SHALL 确保数据格式便于AI读取和理解
-4. WHEN 界面元素变化 THEN 系统 SHALL 支持增量更新和差异检测
-5. WHEN 验证完成 THEN 系统 SHALL 生成详细的验证报告和建议
-
-#### Acceptance Criteria - 自动化测试验证
+#### Acceptance Criteria - GUI自动化验证和测试
 
 1. WHEN 执行GUI验证测试 THEN 系统 SHALL 自动启动配置界面并生成组件层级树
-2. WHEN 组件层级树生成 THEN 系统 SHALL 验证关键UI组件的存在性和正确性
-3. WHEN 验证UI组件布局 THEN 系统 SHALL 检查组件位置、大小是否符合设计规范
-4. WHEN 验证UI组件内容 THEN 系统 SHALL 检查文本标签、按钮标题、选项内容的正确性
-5. WHEN 发现UI问题 THEN 系统 SHALL 记录详细的错误信息并提供修复建议
-
-#### Acceptance Criteria - 测试工具集成
-
-1. WHEN 运行单元测试 THEN 系统 SHALL 包含GUI验证的自动化测试用例
-2. WHEN GUI测试执行 THEN 系统 SHALL 自动触发界面组件层级树的生成和验证
-3. WHEN 测试完成 THEN 系统 SHALL 生成详细的GUI验证报告
-4. WHEN 测试失败 THEN 系统 SHALL 提供具体的失败原因和组件信息
-5. WHEN 测试通过 THEN 系统 SHALL 确认GUI界面符合设计要求和用户体验标准
-
-#### Acceptance Criteria - RDP设置GUI专项验证
-
-1. WHEN 验证RDP质量配置界面 THEN 系统 SHALL 检查所有预设配置选项的正确性
-2. WHEN 验证自定义配置界面 THEN 系统 SHALL 确认所有参数调整控件的功能性
-3. WHEN 验证配置预览功能 THEN 系统 SHALL 检查预览内容与实际配置的一致性
-4. WHEN 验证界面布局 THEN 系统 SHALL 确认组件位置、对齐、间距符合设计规范
-5. WHEN 验证用户交互 THEN 系统 SHALL 测试所有按钮、滑块、下拉框的响应性
+2. WHEN 组件层级树生成 THEN 系统 SHALL 验证关键UI组件的存在性、布局正确性和内容准确性
+3. WHEN 验证RDP设置界面 THEN 系统 SHALL 检查设置选项和控件的正确性
+4. WHEN 运行单元测试 THEN 系统 SHALL 包含完整的GUI验证自动化测试用例并生成详细验证报告
+5. WHEN 发现UI问题或测试失败 THEN 系统 SHALL 记录具体错误信息、失败原因和修复建议
+6. WHEN 测试通过 THEN 系统 SHALL 确认GUI界面符合设计要求和用户体验标准
