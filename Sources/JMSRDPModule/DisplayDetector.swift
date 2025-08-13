@@ -64,6 +64,24 @@ public class DisplayDetector {
         // 检测颜色深度
         let colorDepth = detectColorDepth(displayID: displayID)
         
+        // 获取显示器名称
+        let displayName = getDisplayName(displayID: displayID)
+        
+        // 检测是否为内置显示器
+        let isBuiltIn = isBuiltInDisplay(displayID)
+        
+        // 获取物理尺寸
+        let physicalSize = CGDisplayScreenSize(displayID)
+        
+        // 计算DPI
+        let dpi = calculateDPI(displayID: displayID, physicalSize: physicalSize, width: physicalWidth, height: physicalHeight)
+        
+        // 确定显示器类型
+        let displayType = determineDisplayType(displayID: displayID, width: physicalWidth, height: physicalHeight, isBuiltIn: isBuiltIn, dpi: dpi)
+        
+        // 计算推荐缩放因子
+        let recommendedScale = calculateRecommendedScaleFactor(displayType: displayType, dpi: dpi, isHiDPI: isHiDPI)
+        
         return DisplayConfiguration(
             width: physicalWidth,
             height: physicalHeight,
@@ -71,7 +89,13 @@ public class DisplayDetector {
             colorDepth: colorDepth,
             isHiDPI: isHiDPI,
             refreshRate: refreshRate,
-            displayID: displayID
+            displayID: displayID,
+            displayName: displayName,
+            isBuiltIn: isBuiltIn,
+            physicalSize: physicalSize.width > 0 ? physicalSize : nil,
+            dpi: dpi,
+            recommendedScaleFactor: recommendedScale,
+            displayType: displayType
         )
     }
     
@@ -202,6 +226,104 @@ public class DisplayDetector {
         
         let refreshRate = mode.refreshRate
         return refreshRate > 0 ? refreshRate : 60.0
+    }
+    
+    /// 获取显示器名称
+    /// - Parameter displayID: 显示器ID
+    /// - Returns: 显示器名称
+    private func getDisplayName(displayID: CGDirectDisplayID) -> String {
+        // 尝试获取显示器名称（这在macOS中比较复杂，简化处理）
+        if displayID == CGMainDisplayID() {
+            return "内置显示器"
+        } else {
+            return "外接显示器"
+        }
+    }
+    
+    /// 检测是否为内置显示器
+    /// - Parameter displayID: 显示器ID
+    /// - Returns: 是否为内置显示器
+    private func isBuiltInDisplay(_ displayID: CGDirectDisplayID) -> Bool {
+        return displayID == CGMainDisplayID()
+    }
+    
+    /// 计算DPI
+    /// - Parameters:
+    ///   - displayID: 显示器ID
+    ///   - physicalSize: 物理尺寸
+    ///   - width: 像素宽度
+    ///   - height: 像素高度
+    /// - Returns: DPI值
+    private func calculateDPI(displayID: CGDirectDisplayID, physicalSize: CGSize, width: Int, height: Int) -> Double {
+        guard physicalSize.width > 0 && physicalSize.height > 0 else {
+            return 96.0 // 默认DPI
+        }
+        
+        let dpiX = Double(width) / (physicalSize.width / 25.4) // 转换为英寸
+        let dpiY = Double(height) / (physicalSize.height / 25.4)
+        return (dpiX + dpiY) / 2.0
+    }
+    
+    /// 确定显示器类型
+    /// - Parameters:
+    ///   - displayID: 显示器ID
+    ///   - width: 像素宽度
+    ///   - height: 像素高度
+    ///   - isBuiltIn: 是否内置
+    ///   - dpi: DPI值
+    /// - Returns: 显示器类型
+    private func determineDisplayType(displayID: CGDirectDisplayID, width: Int, height: Int, isBuiltIn: Bool, dpi: Double) -> DisplayType {
+        // 检查是否为超宽屏
+        let aspectRatio = Double(width) / Double(height)
+        if aspectRatio >= 2.0 {
+            return .ultraWide
+        }
+        
+        // 检查是否为内置Retina
+        if isBuiltIn && dpi > 200 {
+            return .builtInRetina
+        }
+        
+        // 检查是否为4K显示器
+        if width >= 3840 && height >= 2160 {
+            return .external4K
+        }
+        
+        // 检查是否为外接HD显示器
+        if !isBuiltIn && width >= 1920 && height >= 1080 {
+            return .externalHD
+        }
+        
+        return .unknown
+    }
+    
+    /// 计算推荐缩放因子
+    /// - Parameters:
+    ///   - displayType: 显示器类型
+    ///   - dpi: DPI值
+    ///   - isHiDPI: 是否HiDPI
+    /// - Returns: 推荐缩放因子
+    private func calculateRecommendedScaleFactor(displayType: DisplayType, dpi: Double, isHiDPI: Bool) -> Double {
+        // 首先基于显示器类型
+        var recommendedScale = displayType.recommendedScaleFactor
+        
+        // 然后基于DPI微调
+        switch dpi {
+        case ..<120:
+            recommendedScale = max(recommendedScale, 1.0)
+        case 120..<150:
+            recommendedScale = max(recommendedScale, 1.25)
+        case 150..<200:
+            recommendedScale = max(recommendedScale, 1.5)
+        case 200..<250:
+            recommendedScale = max(recommendedScale, 2.0)
+        case 250..<300:
+            recommendedScale = max(recommendedScale, 2.5)
+        default:
+            recommendedScale = max(recommendedScale, 3.0)
+        }
+        
+        return recommendedScale
     }
     
     private func detectColorDepth(displayID: CGDirectDisplayID) -> Int {
