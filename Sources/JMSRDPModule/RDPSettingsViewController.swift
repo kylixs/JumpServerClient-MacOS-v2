@@ -38,7 +38,6 @@ public class RDPSettingsViewController: NSViewController {
     private var resolutionPopup: NSPopUpButton!
     private var customWidthField: NSTextField!
     private var customHeightField: NSTextField!
-    private var autoDetectButton: NSButton!
     private var hiDPICheckbox: NSButton!
     private var scaleFactorSlider: NSSlider!
     private var scaleFactorLabel: NSTextField!
@@ -58,7 +57,6 @@ public class RDPSettingsViewController: NSViewController {
     private var customScaleFactorField: NSTextField!
     private var scaleFactorStepper: NSStepper!
     private var scaleFactorPreview: NSTextField!
-    private var scaleFactorModeSegment: NSSegmentedControl!
     
     // 服务和数据
     private var displayDetector = DisplayDetector()
@@ -91,17 +89,29 @@ public class RDPSettingsViewController: NSViewController {
         super.viewDidLoad()
         updateStatusLabel("就绪")
         
-        logInfo("📱 RDP设置界面已加载，默认不选择显示器以避免修改配置")
+        // 初始化控件状态 - 根据autoDetectionCheckbox的状态决定
+        let isAutoDetectionEnabled = autoDetectionCheckbox.state == .on
+        updateManualControlsState(!isAutoDetectionEnabled)
         
-        // 延迟检测显示器，但不自动选择
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.refreshDisplaysWithoutSelection()
+        logInfo("📱 RDP设置界面已加载，自动检测模式: \(isAutoDetectionEnabled)")
+        
+        // 如果启用自动检测，延迟检测显示器配置
+        if isAutoDetectionEnabled {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.autoDetectionChanged(self?.autoDetectionCheckbox ?? NSButton())
+            }
+        } else {
+            // 手动模式下，刷新显示器列表
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.refreshDisplaysAndSelectFirst()
+            }
         }
     }
     
     // MARK: - UI设置
     private func setupUI() {
         setupTitleAndProfile()
+        setupAutoDetectionControls()  // 将自动检测放到第一行
         setupDisplaySelection()
         setupResolutionControls()
         setupHiDPIControls()
@@ -114,53 +124,67 @@ public class RDPSettingsViewController: NSViewController {
     
     private func setupDisplaySelection() {
         // 显示器选择区域标题
-        let displaySectionLabel = NSTextField(labelWithString: "显示器选择")
+        let displaySectionLabel = NSTextField(labelWithString: "手动显示器选择")
         displaySectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        displaySectionLabel.frame = NSRect(x: 20, y: 650, width: 120, height: 20)
+        displaySectionLabel.frame = NSRect(x: 20, y: 620, width: 150, height: 20)
         view.addSubview(displaySectionLabel)
         
         // 显示器选择下拉菜单
         displaySelectionPopup = NSPopUpButton()
         displaySelectionPopup.target = self
         displaySelectionPopup.action = #selector(displaySelectionChanged(_:))
-        displaySelectionPopup.frame = NSRect(x: 20, y: 620, width: 400, height: 25)
+        displaySelectionPopup.frame = NSRect(x: 20, y: 590, width: 320, height: 25)
         view.addSubview(displaySelectionPopup)
+        
+        // 应用推荐按钮（显示器右侧）
+        let applyDisplayConfigButton = NSButton(title: "应用推荐", target: self, action: #selector(applySelectedDisplayConfig(_:)))
+        applyDisplayConfigButton.bezelStyle = .rounded
+        applyDisplayConfigButton.frame = NSRect(x: 350, y: 590, width: 80, height: 25)
+        applyDisplayConfigButton.toolTip = "应用选定显示器的推荐RDP配置"
+        view.addSubview(applyDisplayConfigButton)
         
         // 刷新显示器按钮
         refreshDisplaysButton = NSButton(title: "刷新", target: self, action: #selector(refreshDisplays(_:)))
         refreshDisplaysButton.bezelStyle = .rounded
-        refreshDisplaysButton.frame = NSRect(x: 430, y: 620, width: 60, height: 25)
+        refreshDisplaysButton.frame = NSRect(x: 440, y: 590, width: 60, height: 25)
         view.addSubview(refreshDisplaysButton)
         
-        // 显示器信息面板
+        // 显示器信息面板（调整位置避免重叠）
         displayInfoPanel = NSView()
-        displayInfoPanel.frame = NSRect(x: 20, y: 560, width: 540, height: 50)
+        displayInfoPanel.frame = NSRect(x: 20, y: 480, width: 540, height: 100)
         displayInfoPanel.wantsLayer = true
         displayInfoPanel.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         displayInfoPanel.layer?.cornerRadius = 6
         view.addSubview(displayInfoPanel)
         
         // 显示器名称标签
-        displayNameLabel = NSTextField(labelWithString: "检测中...")
+        displayNameLabel = NSTextField(labelWithString: "未选择显示器")
         displayNameLabel.font = NSFont.boldSystemFont(ofSize: 12)
-        displayNameLabel.frame = NSRect(x: 10, y: 25, width: 520, height: 20)
+        displayNameLabel.frame = NSRect(x: 10, y: 75, width: 520, height: 20)
         displayInfoPanel.addSubview(displayNameLabel)
         
         // 显示器规格标签
-        displaySpecsLabel = NSTextField(labelWithString: "")
+        displaySpecsLabel = NSTextField(labelWithString: "请选择显示器以查看详细信息")
         displaySpecsLabel.font = NSFont.systemFont(ofSize: 11)
         displaySpecsLabel.textColor = NSColor.secondaryLabelColor
-        displaySpecsLabel.frame = NSRect(x: 10, y: 5, width: 350, height: 15)
+        displaySpecsLabel.frame = NSRect(x: 10, y: 55, width: 520, height: 15)
         displayInfoPanel.addSubview(displaySpecsLabel)
         
         // 推荐配置标签
         recommendationLabel = NSTextField(labelWithString: "")
         recommendationLabel.font = NSFont.systemFont(ofSize: 11)
         recommendationLabel.textColor = NSColor.systemBlue
-        recommendationLabel.frame = NSRect(x: 370, y: 5, width: 160, height: 15)
+        recommendationLabel.frame = NSRect(x: 10, y: 35, width: 520, height: 15)
         displayInfoPanel.addSubview(recommendationLabel)
         
-        // 注意：不在这里调用refreshDisplays，而是在viewDidLoad中调用
+        // 详细信息标签
+        let detailInfoLabel = NSTextField(labelWithString: "")
+        detailInfoLabel.font = NSFont.systemFont(ofSize: 10)
+        detailInfoLabel.textColor = NSColor.tertiaryLabelColor
+        detailInfoLabel.frame = NSRect(x: 10, y: 15, width: 520, height: 15)
+        displayInfoPanel.addSubview(detailInfoLabel)
+        
+        logInfo("📺 显示器选择界面初始化完成，默认未选择显示器")
     }
     
     private func setupTitleAndProfile() {
@@ -187,16 +211,26 @@ public class RDPSettingsViewController: NSViewController {
         view.addSubview(profileSegmentedControl)
     }
     
+    private func setupAutoDetectionControls() {
+        // 自动检测选项 - 放在第一行，对应useAutoDetection配置
+        autoDetectionCheckbox = NSButton(checkboxWithTitle: "自动检测显示器配置", target: self, action: #selector(autoDetectionChanged(_:)))
+        autoDetectionCheckbox.frame = NSRect(x: 20, y: 650, width: 200, height: 20)
+        autoDetectionCheckbox.state = .on  // 默认启用
+        view.addSubview(autoDetectionCheckbox)
+    }
+    
+
+    
     private func setupResolutionControls() {
         // 分辨率设置区域标题
         let resolutionSectionLabel = NSTextField(labelWithString: "分辨率设置")
         resolutionSectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        resolutionSectionLabel.frame = NSRect(x: 20, y: 520, width: 100, height: 20)
+        resolutionSectionLabel.frame = NSRect(x: 20, y: 450, width: 100, height: 20)
         view.addSubview(resolutionSectionLabel)
         
         // 分辨率预设选择
         let resolutionLabel = NSTextField(labelWithString: "预设分辨率:")
-        resolutionLabel.frame = NSRect(x: 20, y: 490, width: 100, height: 20)
+        resolutionLabel.frame = NSRect(x: 20, y: 420, width: 100, height: 20)
         view.addSubview(resolutionLabel)
         
         resolutionPopup = NSPopUpButton()
@@ -209,43 +243,37 @@ public class RDPSettingsViewController: NSViewController {
         resolutionPopup.selectItem(at: 1)
         resolutionPopup.target = self
         resolutionPopup.action = #selector(resolutionChanged(_:))
-        resolutionPopup.frame = NSRect(x: 130, y: 490, width: 180, height: 25)
+        resolutionPopup.frame = NSRect(x: 130, y: 420, width: 180, height: 25)
         view.addSubview(resolutionPopup)
         
-        // 自动检测按钮
-        autoDetectButton = NSButton(title: "自动检测", target: self, action: #selector(autoDetectResolution(_:)))
-        autoDetectButton.bezelStyle = .rounded
-        autoDetectButton.frame = NSRect(x: 320, y: 490, width: 80, height: 25)
-        view.addSubview(autoDetectButton)
-        
-        // 自定义分辨率输入
+        // 自定义分辨率输入 - 调整位置避免重叠
         let customLabel = NSTextField(labelWithString: "自定义:")
-        customLabel.frame = NSRect(x: 20, y: 460, width: 60, height: 20)
+        customLabel.frame = NSRect(x: 20, y: 390, width: 60, height: 20)
         view.addSubview(customLabel)
         
         customWidthField = NSTextField()
         customWidthField.placeholderString = "宽度"
         customWidthField.target = self
         customWidthField.action = #selector(customResolutionChanged(_:))
-        customWidthField.frame = NSRect(x: 80, y: 460, width: 80, height: 25)
+        customWidthField.frame = NSRect(x: 80, y: 390, width: 80, height: 25)
         customWidthField.isEnabled = false
         view.addSubview(customWidthField)
         
         let xLabel = NSTextField(labelWithString: "×")
-        xLabel.frame = NSRect(x: 170, y: 460, width: 15, height: 20)
+        xLabel.frame = NSRect(x: 170, y: 390, width: 15, height: 20)
         view.addSubview(xLabel)
         
         customHeightField = NSTextField()
         customHeightField.placeholderString = "高度"
         customHeightField.target = self
         customHeightField.action = #selector(customResolutionChanged(_:))
-        customHeightField.frame = NSRect(x: 190, y: 460, width: 80, height: 25)
+        customHeightField.frame = NSRect(x: 190, y: 390, width: 80, height: 25)
         customHeightField.isEnabled = false
         view.addSubview(customHeightField)
         
         // 带宽需求显示
         bandwidthLabel = NSTextField(labelWithString: "预计带宽: 5-10 Mbps")
-        bandwidthLabel.frame = NSRect(x: 290, y: 460, width: 200, height: 20)
+        bandwidthLabel.frame = NSRect(x: 290, y: 390, width: 200, height: 20)
         bandwidthLabel.textColor = NSColor.secondaryLabelColor
         view.addSubview(bandwidthLabel)
     }
@@ -254,33 +282,18 @@ public class RDPSettingsViewController: NSViewController {
         // HiDPI设置区域标题
         let hiDPISectionLabel = NSTextField(labelWithString: "HiDPI/缩放设置")
         hiDPISectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        hiDPISectionLabel.frame = NSRect(x: 20, y: 420, width: 150, height: 20)
+        hiDPISectionLabel.frame = NSRect(x: 20, y: 360, width: 150, height: 20)
         view.addSubview(hiDPISectionLabel)
         
         // HiDPI启用选项
         hiDPICheckbox = NSButton(checkboxWithTitle: "启用HiDPI优化", target: self, action: #selector(hiDPISettingChanged(_:)))
-        hiDPICheckbox.frame = NSRect(x: 20, y: 390, width: 150, height: 20)
+        hiDPICheckbox.frame = NSRect(x: 20, y: 330, width: 150, height: 20)
         hiDPICheckbox.state = .off
         view.addSubview(hiDPICheckbox)
         
-        // 缩放模式选择
-        let scaleModeLabel = NSTextField(labelWithString: "缩放模式:")
-        scaleModeLabel.frame = NSRect(x: 20, y: 360, width: 80, height: 20)
-        view.addSubview(scaleModeLabel)
-        
-        scaleFactorModeSegment = NSSegmentedControl()
-        scaleFactorModeSegment.segmentCount = 2
-        scaleFactorModeSegment.setLabel("预设", forSegment: 0)
-        scaleFactorModeSegment.setLabel("自定义", forSegment: 1)
-        scaleFactorModeSegment.selectedSegment = 0
-        scaleFactorModeSegment.target = self
-        scaleFactorModeSegment.action = #selector(scaleFactorModeChanged(_:))
-        scaleFactorModeSegment.frame = NSRect(x: 110, y: 360, width: 120, height: 25)
-        view.addSubview(scaleFactorModeSegment)
-        
         // 预设缩放因子滑块
         let scaleLabel = NSTextField(labelWithString: "缩放因子:")
-        scaleLabel.frame = NSRect(x: 20, y: 330, width: 80, height: 20)
+        scaleLabel.frame = NSRect(x: 20, y: 270, width: 80, height: 20)
         view.addSubview(scaleLabel)
         
         scaleFactorSlider = NSSlider()
@@ -291,27 +304,19 @@ public class RDPSettingsViewController: NSViewController {
         scaleFactorSlider.allowsTickMarkValuesOnly = false
         scaleFactorSlider.target = self
         scaleFactorSlider.action = #selector(scaleFactorChanged(_:))
-        scaleFactorSlider.frame = NSRect(x: 110, y: 330, width: 150, height: 25)
+        scaleFactorSlider.frame = NSRect(x: 110, y: 270, width: 150, height: 25)
         view.addSubview(scaleFactorSlider)
         
-        scaleFactorLabel = NSTextField(labelWithString: "100% (1.0x)")
-        scaleFactorLabel.frame = NSRect(x: 270, y: 330, width: 100, height: 20)
-        view.addSubview(scaleFactorLabel)
-        
-        // 自定义缩放因子输入
-        let customScaleLabel = NSTextField(labelWithString: "精确值:")
-        customScaleLabel.frame = NSRect(x: 20, y: 300, width: 60, height: 20)
-        view.addSubview(customScaleLabel)
-        
+        // 精确值输入框放在滑块右侧
         customScaleFactorField = NSTextField()
         customScaleFactorField.placeholderString = "1.00"
         customScaleFactorField.target = self
         customScaleFactorField.action = #selector(customScaleFactorChanged(_:))
-        customScaleFactorField.frame = NSRect(x: 90, y: 300, width: 80, height: 25)
-        customScaleFactorField.isEnabled = false
+        customScaleFactorField.frame = NSRect(x: 270, y: 270, width: 60, height: 25)
+        customScaleFactorField.stringValue = "1.00"
         view.addSubview(customScaleFactorField)
         
-        // 缩放因子步进器
+        // 缩放因子步进器紧挨着输入框
         scaleFactorStepper = NSStepper()
         scaleFactorStepper.minValue = 0.50
         scaleFactorStepper.maxValue = 5.00
@@ -319,22 +324,12 @@ public class RDPSettingsViewController: NSViewController {
         scaleFactorStepper.doubleValue = 1.00
         scaleFactorStepper.target = self
         scaleFactorStepper.action = #selector(scaleFactorStepperChanged(_:))
-        scaleFactorStepper.frame = NSRect(x: 175, y: 300, width: 20, height: 25)
-        scaleFactorStepper.isEnabled = false
+        scaleFactorStepper.frame = NSRect(x: 335, y: 270, width: 20, height: 25)
         view.addSubview(scaleFactorStepper)
         
-        // 缩放预览标签
-        scaleFactorPreview = NSTextField(labelWithString: "100% = 1.0x (标准)")
-        scaleFactorPreview.font = NSFont.systemFont(ofSize: 11)
-        scaleFactorPreview.textColor = NSColor.secondaryLabelColor
-        scaleFactorPreview.frame = NSRect(x: 210, y: 300, width: 200, height: 20)
-        view.addSubview(scaleFactorPreview)
-        
-        // 自动检测选项
-        autoDetectionCheckbox = NSButton(checkboxWithTitle: "自动检测显示器配置", target: self, action: #selector(autoDetectionChanged(_:)))
-        autoDetectionCheckbox.frame = NSRect(x: 20, y: 270, width: 180, height: 20)
-        autoDetectionCheckbox.state = .on
-        view.addSubview(autoDetectionCheckbox)
+        scaleFactorLabel = NSTextField(labelWithString: "100% (1.0x)")
+        scaleFactorLabel.frame = NSRect(x: 365, y: 270, width: 100, height: 20)
+        view.addSubview(scaleFactorLabel)
     }
     
     private func setupCompressionControls() {
@@ -431,12 +426,6 @@ public class RDPSettingsViewController: NSViewController {
         importButton.bezelStyle = .rounded
         importButton.frame = NSRect(x: 350, y: 100, width: 100, height: 30)
         view.addSubview(importButton)
-        
-        // 应用推荐设置按钮
-        let applyRecommendedButton = NSButton(title: "应用推荐设置", target: self, action: #selector(applyRecommendedSettings(_:)))
-        applyRecommendedButton.bezelStyle = .rounded
-        applyRecommendedButton.frame = NSRect(x: 460, y: 100, width: 100, height: 30)
-        view.addSubview(applyRecommendedButton)
     }
     
     private func setupStatusLabel() {
@@ -449,22 +438,90 @@ public class RDPSettingsViewController: NSViewController {
     // MARK: - 显示器选择事件处理
     
     @objc private func displaySelectionChanged(_ sender: NSPopUpButton) {
-        selectedDisplayIndex = sender.indexOfSelectedItem
+        let selectedIndex = sender.indexOfSelectedItem
         
-        guard selectedDisplayIndex < allDisplays.count else { return }
+        // 如果选择的是"请选择显示器..."（索引0），清空信息显示
+        if selectedIndex == 0 {
+            selectedDisplayIndex = -1
+            clearDisplayInfo()
+            logInfo("📺 用户取消选择显示器")
+            return
+        }
+        
+        // 调整索引（因为第0项是"请选择显示器..."）
+        let displayIndex = selectedIndex - 1
+        selectedDisplayIndex = displayIndex
+        
+        guard displayIndex >= 0 && displayIndex < allDisplays.count else { 
+            logWarning("⚠️ 显示器索引超出范围: \(displayIndex)")
+            return 
+        }
+        
+        let selectedDisplay = allDisplays[displayIndex]
+        
+        logInfo("📺 用户选择显示器: \(selectedDisplay.displayName ?? "未知")，仅显示信息")
+        
+        // 仅更新显示器信息，不应用配置
+        updateDisplayInfo(selectedDisplay)
+        
+        updateStatusLabel("已选择显示器: \(selectedDisplay.displayName ?? "未知显示器")（点击'应用推荐'来应用配置）")
+    }
+    
+    @objc private func applySelectedDisplayConfig(_ sender: NSButton) {
+        guard selectedDisplayIndex >= 0 && selectedDisplayIndex < allDisplays.count else {
+            showAlert("未选择显示器", message: "请先选择一个显示器，然后点击'应用推荐'来应用其配置。")
+            return
+        }
         
         let selectedDisplay = allDisplays[selectedDisplayIndex]
         
-        // 自动应用选定显示器的配置
-        applyDisplayConfiguration(selectedDisplay)
+        logInfo("🔧 用户点击应用推荐配置: \(selectedDisplay.displayName ?? "未知")")
         
-        // 更新显示器信息
-        updateDisplayInfo(selectedDisplay)
+        // 显示确认对话框
+        let alert = NSAlert()
+        alert.messageText = "应用推荐配置"
+        alert.informativeText = """
+        确定要应用以下推荐配置吗？
         
-        // 触发设置变更
-        settingsChanged()
+        显示器: \(selectedDisplay.displayName ?? "未知")
+        分辨率: \(selectedDisplay.width)×\(selectedDisplay.height)
+        HiDPI: \(selectedDisplay.isHiDPI ? "启用" : "禁用")
+        推荐缩放: \(selectedDisplay.recommendedScaleFactor)x
         
-        updateStatusLabel("已切换到显示器: \(selectedDisplay.displayName ?? "未知显示器")")
+        这将修改当前的RDP设置。
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "应用配置")
+        alert.addButton(withTitle: "取消")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // 用户确认应用配置
+            applyDisplayConfiguration(selectedDisplay)
+            settingsChanged()
+            updateStatusLabel("✅ 已应用显示器推荐配置: \(selectedDisplay.displayName ?? "未知显示器")")
+            logInfo("✅ 已应用显示器推荐配置")
+            
+            // 显示成功通知
+            showAlert("配置已应用", message: "显示器推荐配置已成功应用到RDP设置中。")
+        } else {
+            // 用户取消
+            updateStatusLabel("已取消应用配置")
+            logInfo("❌ 用户取消应用显示器配置")
+        }
+    }
+    
+    private func clearDisplayInfo() {
+        displayNameLabel.stringValue = "未选择显示器"
+        displaySpecsLabel.stringValue = "请选择显示器以查看详细信息"
+        recommendationLabel.stringValue = ""
+        
+        // 清空详细信息
+        if displayInfoPanel.subviews.count > 3 {
+            if let detailLabel = displayInfoPanel.subviews[3] as? NSTextField {
+                detailLabel.stringValue = ""
+            }
+        }
     }
     
     @objc private func refreshDisplays(_ sender: NSButton?) {
@@ -491,28 +548,27 @@ public class RDPSettingsViewController: NSViewController {
         }
     }
     
-    // MARK: - 自定义缩放因子事件处理
-    
-    @objc private func scaleFactorModeChanged(_ sender: NSSegmentedControl) {
-        let isCustomMode = sender.selectedSegment == 1
+    private func refreshDisplaysAndSelectFirst() {
+        updateStatusLabel("正在刷新显示器列表...")
         
-        // 切换控件状态
-        scaleFactorSlider.isEnabled = !isCustomMode && hiDPICheckbox.state == .on
-        customScaleFactorField.isEnabled = isCustomMode && hiDPICheckbox.state == .on
-        scaleFactorStepper.isEnabled = isCustomMode && hiDPICheckbox.state == .on
-        
-        if isCustomMode {
-            // 切换到自定义模式，同步滑块值到输入框
-            customScaleFactorField.doubleValue = scaleFactorSlider.doubleValue
-            scaleFactorStepper.doubleValue = scaleFactorSlider.doubleValue
-        } else {
-            // 切换到预设模式，同步输入框值到滑块
-            scaleFactorSlider.doubleValue = customScaleFactorField.doubleValue
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                let displays = try self?.displayDetector.detectAllDisplays() ?? []
+                
+                DispatchQueue.main.async {
+                    self?.allDisplays = displays
+                    self?.updateDisplaySelectionMenuAndSelectFirst()
+                    self?.updateStatusLabel("显示器列表已更新，检测到 \(displays.count) 个显示器")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.updateStatusLabel("显示器检测失败: \(error.localizedDescription)")
+                }
+            }
         }
-        
-        updateScaleFactorPreview()
-        settingsChanged()
     }
+    
+    // MARK: - 自定义缩放因子事件处理
     
     @objc private func customScaleFactorChanged(_ sender: NSTextField) {
         let value = sender.doubleValue
@@ -523,10 +579,17 @@ public class RDPSettingsViewController: NSViewController {
             updateStatusLabel("缩放因子已调整到有效范围 (0.50-5.00)")
         }
         
-        // 同步到步进器
-        scaleFactorStepper.doubleValue = sender.doubleValue
+        // 同步到滑块和步进器
+        let clampedValue = max(0.50, min(5.00, sender.doubleValue))
         
-        updateScaleFactorPreview()
+        // 只有在滑块范围内才同步到滑块
+        if clampedValue >= scaleFactorSlider.minValue && clampedValue <= scaleFactorSlider.maxValue {
+            scaleFactorSlider.doubleValue = clampedValue
+        }
+        
+        scaleFactorStepper.doubleValue = clampedValue
+        
+        updateScaleFactorLabel()
         settingsChanged()
     }
     
@@ -534,7 +597,13 @@ public class RDPSettingsViewController: NSViewController {
         // 同步到输入框
         customScaleFactorField.doubleValue = sender.doubleValue
         
-        updateScaleFactorPreview()
+        // 只有在滑块范围内才同步到滑块
+        let value = sender.doubleValue
+        if value >= scaleFactorSlider.minValue && value <= scaleFactorSlider.maxValue {
+            scaleFactorSlider.doubleValue = value
+        }
+        
+        updateScaleFactorLabel()
         settingsChanged()
     }
     
@@ -574,6 +643,44 @@ public class RDPSettingsViewController: NSViewController {
         logInfo("📺 显示器菜单已更新，检测到 \(allDisplays.count) 个显示器，默认未选择")
     }
     
+    private func updateDisplaySelectionMenuAndSelectFirst() {
+        // 确保UI组件已经初始化
+        guard let displaySelectionPopup = displaySelectionPopup else {
+            logWarning("⚠️ 显示器选择菜单尚未初始化，跳过更新")
+            return
+        }
+        
+        // 清空现有项目
+        displaySelectionPopup.removeAllItems()
+        
+        // 首先添加默认的"请选择显示器"选项
+        displaySelectionPopup.addItem(withTitle: "请选择显示器...")
+        
+        // 添加检测到的显示器
+        for (_, display) in allDisplays.enumerated() {
+            let displayName = getDisplayName(for: display)
+            displaySelectionPopup.addItem(withTitle: displayName)
+        }
+        
+        // 如果有显示器，默认选择第一个显示器
+        if !allDisplays.isEmpty {
+            displaySelectionPopup.selectItem(at: 1) // 选择第一个显示器（索引1，因为索引0是"请选择显示器..."）
+            selectedDisplayIndex = 0 // 第一个显示器的实际索引
+            
+            let firstDisplay = allDisplays[0]
+            updateDisplayInfo(firstDisplay)
+            updateStatusLabel("已默认选择显示器: \(firstDisplay.displayName ?? "未知显示器")（点击'应用推荐'来应用配置）")
+            
+            logInfo("📺 显示器菜单已更新，检测到 \(allDisplays.count) 个显示器，默认选择第一个")
+        } else {
+            // 没有显示器时的处理
+            displaySelectionPopup.selectItem(at: 0)
+            selectedDisplayIndex = -1
+            clearDisplayInfo()
+            logInfo("📺 显示器菜单已更新，未检测到显示器")
+        }
+    }
+    
     private func getDisplayName(for display: DisplayConfiguration) -> String {
         let displayNumber = allDisplays.firstIndex(where: { $0.displayID == display.displayID }) ?? 0
         let isMain = display.displayID == CGMainDisplayID()
@@ -588,21 +695,40 @@ public class RDPSettingsViewController: NSViewController {
         guard let displayNameLabel = displayNameLabel,
               let displaySpecsLabel = displaySpecsLabel,
               let recommendationLabel = recommendationLabel else {
-            print("⚠️ 显示器信息UI组件尚未初始化，跳过更新")
+            logWarning("⚠️ 显示器信息UI组件尚未初始化，跳过更新")
             return
         }
         
         // 更新显示器名称
         displayNameLabel.stringValue = getDisplayName(for: display)
         
-        // 更新显示器规格
-        let dpiText = String(format: "%.0f", display.dpi ?? 96.0)
-        let refreshText = display.refreshRate > 0 ? String(format: "%.0fHz", display.refreshRate) : "未知"
-        displaySpecsLabel.stringValue = "DPI: \(dpiText), 刷新率: \(refreshText), 颜色深度: \(display.colorDepth)位"
+        // 更新显示器规格信息
+        let dpiInfo = display.dpi != nil && display.dpi! > 0 ? String(format: "%.0f DPI", display.dpi!) : "DPI未知"
+        let refreshInfo = display.refreshRate > 0 ? "\(display.refreshRate)Hz" : "刷新率未知"
+        let colorInfo = "\(display.colorDepth)位色彩"
         
-        // 更新推荐配置
-        let recommendedScale = getRecommendedScaleFactor(for: display)
-        recommendationLabel.stringValue = "推荐缩放: \(String(format: "%.2f", recommendedScale))x"
+        displaySpecsLabel.stringValue = "分辨率: \(display.width)×\(display.height) | \(dpiInfo) | \(refreshInfo) | \(colorInfo)"
+        
+        // 更新推荐配置信息
+        let hiDPIStatus = display.isHiDPI ? "启用HiDPI" : "标准显示"
+        let scaleInfo = String(format: "推荐缩放: %.1fx", display.recommendedScaleFactor)
+        let typeInfo = "类型: \(display.displayType.description)"
+        
+        recommendationLabel.stringValue = "\(hiDPIStatus) | \(scaleInfo) | \(typeInfo)"
+        
+        // 更新详细信息（如果有详细信息标签）
+        if displayInfoPanel.subviews.count > 3 {
+            if let detailLabel = displayInfoPanel.subviews[3] as? NSTextField {
+                let builtInInfo = display.isBuiltIn ? "内置显示器" : "外接显示器"
+                let physicalSize = display.physicalSize != nil ? 
+                    String(format: "物理尺寸: %.1f×%.1f mm", display.physicalSize!.width, display.physicalSize!.height) : 
+                    "物理尺寸未知"
+                
+                detailLabel.stringValue = "\(builtInInfo) | \(physicalSize) | 缩放因子: \(display.scaleFactor)x"
+            }
+        }
+        
+        logInfo("📺 显示器信息已更新: \(display.displayName ?? "未知")")
     }
     
     private func getRecommendedScaleFactor(for display: DisplayConfiguration) -> Double {
@@ -622,26 +748,6 @@ public class RDPSettingsViewController: NSViewController {
         default:
             return 3.0
         }
-    }
-    
-    private func updateScaleFactorPreview() {
-        let scaleFactor: Double
-        
-        if scaleFactorModeSegment.selectedSegment == 1 {
-            // 自定义模式
-            scaleFactor = customScaleFactorField.doubleValue
-        } else {
-            // 预设模式
-            scaleFactor = scaleFactorSlider.doubleValue
-        }
-        
-        let percentage = Int(scaleFactor * 100)
-        let description = getScaleFactorDescription(scaleFactor)
-        
-        scaleFactorPreview.stringValue = "\(percentage)% = \(String(format: "%.2f", scaleFactor))x (\(description))"
-        
-        // 更新滑块标签
-        scaleFactorLabel.stringValue = "\(percentage)% (\(String(format: "%.2f", scaleFactor))x)"
     }
     
     private func getScaleFactorDescription(_ scaleFactor: Double) -> String {
@@ -674,25 +780,20 @@ public class RDPSettingsViewController: NSViewController {
         // 更新HiDPI设置
         hiDPICheckbox.state = display.isHiDPI ? .on : .off
         
-        // 使用显示器的实际缩放因子，而不是推荐值
+        // 使用显示器的实际缩放因子，同时更新滑块和精确值输入框
         let actualScaleFactor = display.scaleFactor
         
-        if scaleFactorModeSegment.selectedSegment == 1 {
-            // 自定义模式 - 使用实际缩放因子
-            customScaleFactorField.doubleValue = actualScaleFactor
-            scaleFactorStepper.doubleValue = actualScaleFactor
-        } else {
-            // 预设模式 - 使用实际缩放因子
-            scaleFactorSlider.doubleValue = actualScaleFactor
-        }
+        scaleFactorSlider.doubleValue = actualScaleFactor
+        customScaleFactorField.doubleValue = actualScaleFactor
+        scaleFactorStepper.doubleValue = actualScaleFactor
         
         // 启用/禁用相关控件
         let hiDPIEnabled = display.isHiDPI
-        scaleFactorSlider.isEnabled = hiDPIEnabled && scaleFactorModeSegment.selectedSegment == 0
-        customScaleFactorField.isEnabled = hiDPIEnabled && scaleFactorModeSegment.selectedSegment == 1
-        scaleFactorStepper.isEnabled = hiDPIEnabled && scaleFactorModeSegment.selectedSegment == 1
+        scaleFactorSlider.isEnabled = hiDPIEnabled
+        customScaleFactorField.isEnabled = hiDPIEnabled
+        scaleFactorStepper.isEnabled = hiDPIEnabled
         
-        updateScaleFactorPreview()
+        updateScaleFactorLabel()
         updateBandwidthDisplay()
         
         print("🖥️ 已应用显示器配置 - 分辨率: \(display.width)×\(display.height), HiDPI: \(display.isHiDPI), 实际缩放: \(actualScaleFactor)")
@@ -708,7 +809,8 @@ public class RDPSettingsViewController: NSViewController {
         // 简化的带宽计算
         let pixelCount = width * height
         let bitsPerPixel = colorDepth
-        let rawBandwidth = Double(pixelCount * bitsPerPixel) / 8.0 / 1024.0 / 1024.0 * 30.0 // 30fps
+        let totalBits = Double(pixelCount) * Double(bitsPerPixel)
+        let rawBandwidth = totalBits / 8.0 / 1024.0 / 1024.0 * 30.0 // 30fps
         
         // 应用压缩因子
         let compressionFactor: Double
@@ -752,9 +854,12 @@ public class RDPSettingsViewController: NSViewController {
     // MARK: - 新的事件处理方法
     
     @objc private func resolutionChanged(_ sender: NSPopUpButton) {
+        let isAutoDetectionEnabled = autoDetectionCheckbox.state == .on
         let isCustom = sender.indexOfSelectedItem == 3
-        customWidthField.isEnabled = isCustom
-        customHeightField.isEnabled = isCustom
+        
+        // 只有在手动模式下才启用自定义分辨率输入
+        customWidthField.isEnabled = !isAutoDetectionEnabled && isCustom
+        customHeightField.isEnabled = !isAutoDetectionEnabled && isCustom
         
         if !isCustom {
             customWidthField.stringValue = ""
@@ -778,31 +883,107 @@ public class RDPSettingsViewController: NSViewController {
         settingsChanged()
     }
     
-    @objc private func autoDetectResolution(_ sender: NSButton) {
-        detectCurrentDisplay()
-        updateStatusLabel("正在检测显示器配置...")
-    }
-    
     @objc private func hiDPISettingChanged(_ sender: NSButton) {
-        scaleFactorSlider.isEnabled = sender.state == .on
-        if sender.state == .off {
+        let isAutoDetectionEnabled = autoDetectionCheckbox.state == .on
+        let isHiDPIEnabled = sender.state == .on
+        
+        // 只有在手动模式下才启用相关控件
+        if !isAutoDetectionEnabled {
+            scaleFactorSlider.isEnabled = isHiDPIEnabled
+            customScaleFactorField.isEnabled = isHiDPIEnabled
+            scaleFactorStepper.isEnabled = isHiDPIEnabled
+        }
+        
+        if !isHiDPIEnabled {
             scaleFactorSlider.doubleValue = 1.0
+            customScaleFactorField.doubleValue = 1.0
+            scaleFactorStepper.doubleValue = 1.0
             updateScaleFactorLabel()
         }
+        
         settingsChanged()
     }
     
     @objc private func scaleFactorChanged(_ sender: NSSlider) {
+        // 同步滑块值到精确值输入框
+        customScaleFactorField.doubleValue = sender.doubleValue
+        scaleFactorStepper.doubleValue = sender.doubleValue
+        
         updateScaleFactorLabel()
         settingsChanged()
     }
     
     @objc private func autoDetectionChanged(_ sender: NSButton) {
-        if sender.state == .on {
-            detectCurrentDisplay()
+        let isAutoDetectionEnabled = sender.state == .on
+        
+        // 启用/禁用手动配置控件
+        updateManualControlsState(!isAutoDetectionEnabled)
+        
+        // 如果启用自动检测，自动检测并应用显示器配置
+        if isAutoDetectionEnabled {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                do {
+                    let displayConfig = try self?.displayDetector.detectPrimaryDisplay()
+                    
+                    DispatchQueue.main.async {
+                        if let config = displayConfig {
+                            self?.applyDisplayConfiguration(config)
+                            self?.settingsChanged()
+                            self?.updateStatusLabel("✅ 已自动检测并应用显示器配置")
+                        } else {
+                            self?.updateStatusLabel("⚠️ 自动检测失败，请手动配置")
+                        }
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self?.updateStatusLabel("❌ 显示器检测失败: \(error.localizedDescription)")
+                    }
+                }
+            }
+        } else {
+            updateStatusLabel("已切换到手动配置模式")
         }
+        
         settingsChanged()
     }
+    
+    private func updateManualControlsState(_ enabled: Bool) {
+        // 显示器选择相关控件
+        displaySelectionPopup?.isEnabled = enabled
+        refreshDisplaysButton?.isEnabled = enabled
+        
+        // 分辨率设置相关控件
+        resolutionPopup?.isEnabled = enabled
+        
+        // 自定义分辨率控件（只有在手动模式且选择了自定义分辨率时才启用）
+        let isCustomResolution = resolutionPopup?.indexOfSelectedItem == 3
+        customWidthField?.isEnabled = enabled && isCustomResolution
+        customHeightField?.isEnabled = enabled && isCustomResolution
+        
+        // HiDPI相关控件
+        hiDPICheckbox?.isEnabled = enabled
+        
+        // 缩放因子控件
+        let isHiDPIEnabled = hiDPICheckbox?.state == .on
+        
+        scaleFactorSlider?.isEnabled = enabled && isHiDPIEnabled
+        customScaleFactorField?.isEnabled = enabled && isHiDPIEnabled
+        scaleFactorStepper?.isEnabled = enabled && isHiDPIEnabled
+        
+        // 更新界面视觉反馈
+        displayInfoPanel?.alphaValue = enabled ? 1.0 : 0.6
+        
+        // 如果禁用手动控件，清空显示器选择
+        if !enabled {
+            displaySelectionPopup?.selectItem(at: 0) // 选择"请选择显示器..."
+            selectedDisplayIndex = -1
+            clearDisplayInfo()
+        }
+    }
+    
+
+    
+
     
     @objc private func applyRecommendedSettings(_ sender: NSButton) {
         do {
@@ -816,9 +997,10 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateScaleFactorLabel() {
-        let scaleFactor = scaleFactorSlider.doubleValue
-        let hiDPISettings = HiDPISettings(enabled: true, scaleFactor: scaleFactor)
-        scaleFactorLabel.stringValue = hiDPISettings.scaleFactorDescription
+        // 使用精确值输入框的值，如果为空则使用滑块的值
+        let scaleFactor = customScaleFactorField.doubleValue > 0 ? customScaleFactorField.doubleValue : scaleFactorSlider.doubleValue
+        let percentage = Int(scaleFactor * 100)
+        scaleFactorLabel.stringValue = "\(percentage)% (\(String(format: "%.2f", scaleFactor))x)"
     }
     
     private func settingsChanged() {
@@ -879,7 +1061,7 @@ public class RDPSettingsViewController: NSViewController {
         // 获取HiDPI设置
         let hiDPI = HiDPISettings(
             enabled: hiDPICheckbox.state == .on,
-            scaleFactor: scaleFactorSlider.doubleValue,
+            scaleFactor: customScaleFactorField.doubleValue > 0 ? customScaleFactorField.doubleValue : scaleFactorSlider.doubleValue,
             autoDetect: autoDetectionCheckbox.state == .on,
             forceHiDPI: false
         )
@@ -935,6 +1117,8 @@ public class RDPSettingsViewController: NSViewController {
         // 更新HiDPI设置
         hiDPICheckbox.state = settings.hiDPI.enabled ? .on : .off
         scaleFactorSlider.doubleValue = settings.hiDPI.scaleFactor
+        customScaleFactorField.doubleValue = settings.hiDPI.scaleFactor
+        scaleFactorStepper.doubleValue = settings.hiDPI.scaleFactor
         scaleFactorSlider.isEnabled = settings.hiDPI.enabled
         updateScaleFactorLabel()
         

@@ -26,16 +26,6 @@ fi
 # 确保脚本有执行权限
 chmod +x "$MACOS_APP_SCRIPT"
 
-echo -e "${BLUE}📋 可用的构建选项:${NC}"
-echo "  1. 规范macOS应用程序构建 (推荐)"
-echo "  2. 规范通用二进制构建"
-echo "  3. Debug模式构建"
-echo "  4. 清理后构建"
-echo "  5. 代码签名构建"
-echo "  6. 详细输出构建"
-echo "  7. 显示帮助信息"
-echo
-
 # 如果有参数，直接传递给构建脚本
 if [ $# -gt 0 ]; then
     case $1 in
@@ -63,8 +53,76 @@ if [ $# -gt 0 ]; then
             echo -e "${GREEN}📝 执行详细输出构建${NC}"
             exec "$MACOS_APP_SCRIPT" --verbose "${@:2}"
             ;;
+        interactive)
+            # 交互式模式
+            echo -e "${BLUE}📋 可用的构建选项:${NC}"
+            echo "  1. 规范macOS应用程序构建 (推荐)"
+            echo "  2. 规范通用二进制构建"
+            echo "  3. Debug模式构建"
+            echo "  4. 清理后构建"
+            echo "  5. 代码签名构建"
+            echo "  6. 详细输出构建"
+            echo "  7. 显示帮助信息"
+            echo
+            read -p "请选择构建选项 (1-7, 默认1): " choice
+            case $choice in
+                1|"")
+                    echo -e "${GREEN}📱 执行规范macOS应用程序构建${NC}"
+                    exec "$MACOS_APP_SCRIPT" --clean
+                    ;;
+                2)
+                    echo -e "${GREEN}🌍 执行规范通用二进制构建${NC}"
+                    exec "$MACOS_APP_SCRIPT" --clean --arch universal
+                    ;;
+                3)
+                    echo -e "${GREEN}🐛 执行Debug模式构建${NC}"
+                    exec "$MACOS_APP_SCRIPT" --clean --configuration debug
+                    ;;
+                4)
+                    echo -e "${GREEN}🧹 执行清理后构建${NC}"
+                    exec "$MACOS_APP_SCRIPT" --clean
+                    ;;
+                5)
+                    echo -e "${GREEN}🔐 执行代码签名构建${NC}"
+                    exec "$MACOS_APP_SCRIPT" --clean --sign
+                    ;;
+                6)
+                    echo -e "${GREEN}📝 执行详细输出构建${NC}"
+                    exec "$MACOS_APP_SCRIPT" --clean --verbose
+                    ;;
+                7)
+                    echo -e "${GREEN}📖 显示帮助信息${NC}"
+                    exec "$MACOS_APP_SCRIPT" --help
+                    ;;
+                *)
+                    echo -e "${RED}❌ 无效选择: $choice${NC}"
+                    echo -e "${YELLOW}请选择 1-7 之间的数字${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
         help|--help|-h)
-            exec "$MACOS_APP_SCRIPT" --help
+            echo -e "${BLUE}📋 JMS Protocol Handler 构建脚本帮助${NC}"
+            echo
+            echo "用法: ./build.sh [选项]"
+            echo
+            echo "选项:"
+            echo "  (无参数)        默认执行macOS应用程序构建"
+            echo "  macos-app       规范macOS应用程序构建"
+            echo "  universal-app   规范通用二进制构建"
+            echo "  debug          Debug模式构建"
+            echo "  clean          清理后构建"
+            echo "  sign           代码签名构建"
+            echo "  verbose        详细输出构建"
+            echo "  interactive    交互式选择构建选项"
+            echo "  help           显示此帮助信息"
+            echo
+            echo "示例:"
+            echo "  ./build.sh                # 默认构建"
+            echo "  ./build.sh clean          # 清理后构建"
+            echo "  ./build.sh interactive    # 交互式选择"
+            echo
+            exit 0
             ;;
         *)
             echo -e "${GREEN}🔄 执行: $MACOS_APP_SCRIPT $@${NC}"
@@ -73,41 +131,8 @@ if [ $# -gt 0 ]; then
     esac
 fi
 
-# 交互式选择
-read -p "请选择构建选项 (1-7, 默认1): " choice
-
-case $choice in
-    1|"")
-        echo -e "${GREEN}📱 执行规范macOS应用程序构建${NC}"
-        exec "$MACOS_APP_SCRIPT" --clean
-        ;;
-    2)
-        echo -e "${GREEN}🌍 执行规范通用二进制构建${NC}"
-        exec "$MACOS_APP_SCRIPT" --clean --arch universal
-        ;;
-    3)
-        echo -e "${GREEN}🐛 执行Debug模式构建${NC}"
-        exec "$MACOS_APP_SCRIPT" --clean --configuration debug
-        ;;
-    4)
-        echo -e "${GREEN}🧹 执行清理后构建${NC}"
-        exec "$MACOS_APP_SCRIPT" --clean
-        ;;
-    5)
-        echo -e "${GREEN}🔐 执行代码签名构建${NC}"
-        exec "$MACOS_APP_SCRIPT" --clean --sign
-        ;;
-    6)
-        echo -e "${GREEN}📝 执行详细输出构建${NC}"
-        exec "$MACOS_APP_SCRIPT" --clean --verbose
-        ;;
-    7)
-        echo -e "${GREEN}📖 显示帮助信息${NC}"
-        exec "$MACOS_APP_SCRIPT" --help
-        ;;
-    *)
-        echo -e "${RED}❌ 无效选择: $choice${NC}"
-        echo -e "${YELLOW}请选择 1-7 之间的数字${NC}"
-        exit 1
-        ;;
-esac
+# 默认行为：直接执行macOS应用程序构建
+echo -e "${GREEN}📱 执行默认macOS应用程序构建${NC}"
+echo -e "${BLUE}💡 提示: 使用 './build.sh interactive' 进入交互式模式${NC}"
+echo
+exec "$MACOS_APP_SCRIPT" --clean
