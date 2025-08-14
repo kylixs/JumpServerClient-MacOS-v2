@@ -49,23 +49,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 同时输出到控制台和文件
         print(message)
         
-        // 写入日志文件
-        if let data = logEntry.data(using: .utf8) {
+        // 写入日志文件 - 简化逻辑并添加错误处理
+        do {
             if FileManager.default.fileExists(atPath: logFileURL.path) {
-                if let fileHandle = try? FileHandle(forWritingTo: logFileURL) {
-                    fileHandle.seekToEndOfFile()
+                // 文件存在，追加内容
+                let fileHandle = try FileHandle(forWritingTo: logFileURL)
+                defer { fileHandle.closeFile() }
+                fileHandle.seekToEndOfFile()
+                if let data = logEntry.data(using: .utf8) {
                     fileHandle.write(data)
-                    fileHandle.closeFile()
                 }
             } else {
-                try? data.write(to: logFileURL)
+                // 文件不存在，创建新文件
+                if let data = logEntry.data(using: .utf8) {
+                    try data.write(to: logFileURL)
+                }
             }
+        } catch {
+            // 如果文件写入失败，至少确保控制台输出
+            print("❌ 日志文件写入失败: \(error)")
         }
     }
     
     // MARK: - 应用程序生命周期
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 立即测试日志记录
+        print("🧪 测试控制台输出")
+        
+        // 测试日志文件创建
+        do {
+            let testMessage = "🧪 测试日志文件创建 - \(Date())\n"
+            try testMessage.write(to: logFileURL, atomically: true, encoding: .utf8)
+            print("✅ 日志文件创建成功: \(logFileURL.path)")
+        } catch {
+            print("❌ 日志文件创建失败: \(error)")
+        }
+        
         logMessage("🚀 JMS Protocol Handler 已启动")
         logMessage("📋 启动时间: \(Date())")
         logMessage("📁 日志文件位置: \(logFileURL.path)")
