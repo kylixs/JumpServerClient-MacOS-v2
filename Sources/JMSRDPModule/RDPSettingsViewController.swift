@@ -91,9 +91,11 @@ public class RDPSettingsViewController: NSViewController {
         super.viewDidLoad()
         updateStatusLabel("就绪")
         
-        // 在UI完全初始化后检测显示器
-        DispatchQueue.main.async { [weak self] in
-            self?.refreshDisplays(nil)
+        logInfo("📱 RDP设置界面已加载，默认不选择显示器以避免修改配置")
+        
+        // 延迟检测显示器，但不自动选择
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refreshDisplaysWithoutSelection()
         }
     }
     
@@ -466,6 +468,10 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     @objc private func refreshDisplays(_ sender: NSButton?) {
+        refreshDisplaysWithoutSelection()
+    }
+    
+    private func refreshDisplaysWithoutSelection() {
         updateStatusLabel("正在刷新显示器列表...")
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -474,7 +480,7 @@ public class RDPSettingsViewController: NSViewController {
                 
                 DispatchQueue.main.async {
                     self?.allDisplays = displays
-                    self?.updateDisplaySelectionMenu()
+                    self?.updateDisplaySelectionMenuWithoutSelection()
                     self?.updateStatusLabel("显示器列表已更新，检测到 \(displays.count) 个显示器")
                 }
             } catch {
@@ -535,32 +541,37 @@ public class RDPSettingsViewController: NSViewController {
     // MARK: - 显示器管理辅助方法
     
     private func updateDisplaySelectionMenu() {
+        updateDisplaySelectionMenuWithoutSelection()
+    }
+    
+    private func updateDisplaySelectionMenuWithoutSelection() {
         // 确保UI组件已经初始化
         guard let displaySelectionPopup = displaySelectionPopup else {
-            print("⚠️ 显示器选择菜单尚未初始化，跳过更新")
+            logWarning("⚠️ 显示器选择菜单尚未初始化，跳过更新")
             return
         }
         
         displaySelectionPopup.removeAllItems()
         
+        // 首先添加默认的"请选择显示器"选项
+        displaySelectionPopup.addItem(withTitle: "请选择显示器...")
+        
+        // 添加检测到的显示器
         for (_, display) in allDisplays.enumerated() {
             let displayName = getDisplayName(for: display)
             displaySelectionPopup.addItem(withTitle: displayName)
         }
         
-        // 选择主显示器作为默认
-        if let mainDisplayIndex = allDisplays.firstIndex(where: { $0.displayID == CGMainDisplayID() }) {
-            selectedDisplayIndex = mainDisplayIndex
-            displaySelectionPopup.selectItem(at: mainDisplayIndex)
-            
-            let mainDisplay = allDisplays[mainDisplayIndex]
-            updateDisplayInfo(mainDisplay)
-            
-            // 如果启用自动检测，应用主显示器配置
-            if let autoDetectionCheckbox = autoDetectionCheckbox, autoDetectionCheckbox.state == .on {
-                applyDisplayConfiguration(mainDisplay)
-            }
-        }
+        // 默认选择"请选择显示器"，不自动选择任何显示器
+        displaySelectionPopup.selectItem(at: 0)
+        selectedDisplayIndex = -1 // 表示未选择
+        
+        // 更新显示器信息为未选择状态
+        displayNameLabel.stringValue = "未选择显示器"
+        displaySpecsLabel.stringValue = "请选择显示器以查看详细信息和应用推荐配置"
+        recommendationLabel.stringValue = ""
+        
+        logInfo("📺 显示器菜单已更新，检测到 \(allDisplays.count) 个显示器，默认未选择")
     }
     
     private func getDisplayName(for display: DisplayConfiguration) -> String {
@@ -819,14 +830,25 @@ public class RDPSettingsViewController: NSViewController {
     
     // MARK: - 数据管理
     private func loadCurrentSettings() {
+        logInfo("📋 开始加载当前配置文件参数...")
+        
         let settings = settingsManager.currentSettings
+        
+        logInfo("📄 配置文件内容:")
+        logInfo("   配置名称: \(settings.profileName)")
+        logInfo("   分辨率: \(settings.resolution.width)×\(settings.resolution.height)")
+        logInfo("   自定义分辨率: \(settings.resolution.isCustom)")
+        logInfo("   HiDPI启用: \(settings.hiDPI.enabled)")
+        logInfo("   缩放因子: \(settings.hiDPI.scaleFactor)")
+        logInfo("   自动检测: \(settings.useAutoDetection)")
+        logInfo("   压缩级别: \(settings.compressionLevel)")
+        logInfo("   颜色深度: \(settings.colorDepth)")
+        logInfo("   音频质量: \(settings.audioQuality)")
+        
+        // 更新UI界面，不触发设置变更事件（避免在加载时修改配置）
         updateUIWithSettings(settings)
         
-        // 更新设置管理器中的当前设置
-        settingsManager.updateSettings(settings)
-        
-        // 通知代理设置已更改
-        delegate?.settingsDidChange(settings)
+        logInfo("✅ 配置文件参数加载完成，未触发设置变更")
     }
     
     private func getCurrentSettingsFromUI() -> RDPSettings {
