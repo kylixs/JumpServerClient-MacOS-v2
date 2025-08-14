@@ -663,16 +663,16 @@ public class RDPSettingsViewController: NSViewController {
         // 更新HiDPI设置
         hiDPICheckbox.state = display.isHiDPI ? .on : .off
         
-        // 应用推荐的缩放因子
-        let recommendedScale = getRecommendedScaleFactor(for: display)
+        // 使用显示器的实际缩放因子，而不是推荐值
+        let actualScaleFactor = display.scaleFactor
         
         if scaleFactorModeSegment.selectedSegment == 1 {
-            // 自定义模式
-            customScaleFactorField.doubleValue = recommendedScale
-            scaleFactorStepper.doubleValue = recommendedScale
+            // 自定义模式 - 使用实际缩放因子
+            customScaleFactorField.doubleValue = actualScaleFactor
+            scaleFactorStepper.doubleValue = actualScaleFactor
         } else {
-            // 预设模式
-            scaleFactorSlider.doubleValue = recommendedScale
+            // 预设模式 - 使用实际缩放因子
+            scaleFactorSlider.doubleValue = actualScaleFactor
         }
         
         // 启用/禁用相关控件
@@ -684,7 +684,7 @@ public class RDPSettingsViewController: NSViewController {
         updateScaleFactorPreview()
         updateBandwidthDisplay()
         
-        print("🖥️ 已应用显示器配置 - 分辨率: \(display.width)×\(display.height), HiDPI: \(display.isHiDPI), 推荐缩放: \(recommendedScale)")
+        print("🖥️ 已应用显示器配置 - 分辨率: \(display.width)×\(display.height), HiDPI: \(display.isHiDPI), 实际缩放: \(actualScaleFactor)")
     }
     
     private func updateBandwidthDisplay() {
