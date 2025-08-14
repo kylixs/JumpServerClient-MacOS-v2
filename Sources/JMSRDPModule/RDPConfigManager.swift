@@ -37,6 +37,31 @@ public class RDPConfigManager {
     
     // MARK: - 主要接口
     
+    /// 使用保存的RDP设置生成配置文件
+    /// - Parameter connectionInfo: RDP连接信息
+    /// - Returns: 完整的RDP配置文件内容
+    /// - Throws: JMSError.configurationError
+    public func generateConfigWithSavedSettings(for connectionInfo: RDPConnectionInfo) throws -> String {
+        // 1. 加载保存的RDP设置
+        let settingsManager = RDPSettingsManager.shared
+        let savedSettings = settingsManager.currentSettings
+        
+        logInfo("🔧 使用保存的RDP设置生成配置")
+        logInfo("   配置名称: \(savedSettings.profileName)")
+        logInfo("   自动检测: \(savedSettings.useAutoDetection)")
+        logInfo("   HiDPI启用: \(savedSettings.hiDPI.enabled)")
+        logInfo("   分辨率: \(savedSettings.resolution.width)×\(savedSettings.resolution.height)")
+        
+        // 2. 检测显示器配置 - 获取逻辑分辨率作为基础配置
+        let displayConfig = try displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
+        
+        // 3. 生成配置文件
+        let configContent = generateRDPConfigFile(connectionInfo: connectionInfo, settings: savedSettings, displayConfig: displayConfig)
+        
+        logInfo("✅ 已使用保存的RDP设置生成配置")
+        return configContent
+    }
+    
     /// 生成优化的RDP配置
     /// - Parameters:
     ///   - connectionInfo: RDP连接信息

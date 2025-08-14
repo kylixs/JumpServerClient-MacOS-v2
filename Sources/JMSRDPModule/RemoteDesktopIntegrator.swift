@@ -29,9 +29,34 @@ public class RemoteDesktopIntegrator {
         try verifyRemoteDesktopInstallation()
         logInfo("✅ Microsoft Remote Desktop 已安装")
         
-        // 2. 生成优化的RDP配置
+        // 2. 生成RDP配置 - 优先使用保存的设置
         logInfo("🔍 步骤2: 生成RDP配置...")
-        let configContent = try configManager.generateOptimizedConfig(for: connectionInfo, quality: quality)
+        let configContent: String
+        
+        // 检查是否有保存的RDP设置
+        let settingsManager = RDPSettingsManager.shared
+        let hasCustomSettings = settingsManager.hasCustomSettings()
+        
+        logInfo("🔍 检查配置文件状态:")
+        logInfo("   配置文件路径: ~/Documents/JMSRDPSettings.json")
+        logInfo("   是否存在自定义设置: \(hasCustomSettings)")
+        
+        if hasCustomSettings {
+            // 使用保存的RDP设置
+            logInfo("🔧 检测到自定义RDP设置，使用保存的配置")
+            let savedSettings = settingsManager.currentSettings
+            logInfo("   配置名称: \(savedSettings.profileName)")
+            logInfo("   自动检测: \(savedSettings.useAutoDetection)")
+            logInfo("   HiDPI启用: \(savedSettings.hiDPI.enabled)")
+            logInfo("   分辨率: \(savedSettings.resolution.width)×\(savedSettings.resolution.height)")
+            configContent = try configManager.generateConfigWithSavedSettings(for: connectionInfo)
+        } else {
+            // 使用质量配置文件（首次使用或未保存设置时）
+            logInfo("🔧 未检测到自定义设置，使用质量配置文件")
+            logInfo("   质量配置: \(quality?.displayName ?? "balanced")")
+            configContent = try configManager.generateOptimizedConfig(for: connectionInfo, quality: quality)
+        }
+        
         logInfo("✅ RDP配置生成成功")
         logDebug("📄 配置内容预览: \(configContent.prefix(200))\(configContent.count > 200 ? "..." : "")")
         

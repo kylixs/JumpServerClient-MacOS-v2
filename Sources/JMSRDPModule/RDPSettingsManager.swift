@@ -26,6 +26,11 @@ public class RDPSettingsManager {
     
     // MARK: - 公共接口
     
+    /// 检查是否有自定义设置
+    public func hasCustomSettings() -> Bool {
+        return FileManager.default.fileExists(atPath: settingsURL.path)
+    }
+    
     /// 获取当前设置
     public var currentSettings: RDPSettings {
         if let settings = _currentSettings {
