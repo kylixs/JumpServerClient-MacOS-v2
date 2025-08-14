@@ -232,7 +232,7 @@ public class RDPConfigManager {
         configLines.append("audiomode:i:\(audioMode)")
         
         // 其他设置
-        configLines.append("smart sizing:i:1")
+        configLines.append("smart sizing:i:0")  // 禁用智能缩放
         configLines.append("screen mode id:i:2")
         
         // HiDPI设置 - 根据最终决定的缩放因子设置

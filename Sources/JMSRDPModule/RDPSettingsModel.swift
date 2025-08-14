@@ -200,7 +200,7 @@ public struct RDPSettings: Codable {
         audiomode:i:\(getAudioMode())
         compression:i:\(compressionLevel)
         session bpp:i:\(colorDepth)
-        smart sizing:i:1
+        smart sizing:i:0
         screen mode id:i:2
         desktopwidth:i:\(resolution.width)
         desktopheight:i:\(resolution.height)
