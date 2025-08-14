@@ -1,5 +1,6 @@
 import Foundation
 import Cocoa
+import UserNotifications
 
 /// 用户通知管理服务
 public class NotificationManager {
@@ -98,17 +99,52 @@ public class NotificationManager {
     
     private func showLegacyNotification(title: String, message: String) {
         DispatchQueue.main.async {
-            let notification = NSUserNotification()
-            notification.title = title
-            notification.informativeText = message
-            notification.soundName = NSUserNotificationDefaultSoundName
-            
-            NSUserNotificationCenter.default.deliver(notification)
+            // 使用现代的UserNotifications框架
+            if #available(macOS 10.14, *) {
+                self.showModernNotification(title: title, message: message)
+            } else {
+                // 对于macOS 10.14以下的系统，使用简单的控制台输出
+                // 因为这些系统版本已经很少使用，且项目最低支持版本是macOS 10.15
+                print("通知: \(title) - \(message)")
+            }
+        }
+    }
+    
+    @available(macOS 10.14, *)
+    private func showModernNotification(title: String, message: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = message
+        content.sound = UNNotificationSound.default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("通知发送失败: \(error.localizedDescription)")
+            }
         }
     }
     
     private func requestNotificationPermission() {
-        // 在正常环境中请求通知权限
-        print("通知权限已请求")
+        // 使用现代的UserNotifications框架请求权限
+        if #available(macOS 10.14, *) {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+                if let error = error {
+                    print("通知权限请求失败: \(error.localizedDescription)")
+                } else if granted {
+                    print("通知权限已授予")
+                } else {
+                    print("通知权限被拒绝")
+                }
+            }
+        } else {
+            // 对于不支持UserNotifications的旧系统，简单记录
+            print("通知权限已请求（系统版本过低，使用控制台输出）")
+        }
     }
 }
