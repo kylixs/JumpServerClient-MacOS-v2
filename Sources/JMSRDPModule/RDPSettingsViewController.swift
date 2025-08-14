@@ -82,7 +82,7 @@ public class RDPSettingsViewController: NSViewController {
     // MARK: - 生命周期
     public override func loadView() {
         print("📱 加载RDP设置界面...")
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 580, height: 720))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 800)) // 增加宽度和高度
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
@@ -117,49 +117,50 @@ public class RDPSettingsViewController: NSViewController {
     
     // MARK: - UI设置
     private func setupUI() {
-        setupTitleAndProfile()
-        setupAutoDetectionControls()  // 将自动检测放到第一行
-        setupDisplaySelection()
-        setupResolutionControls()
-        setupHiDPIControls()
-        setupCompressionControls()
-        setupQualityControls()
-        setupEffectControls()
-        setupAdvancedDisplayControls()  // 新增：高级显示设置
-        setupActionButtons()
-        setupStatusLabel()
+        setupTitleAndProfile()           // Y: 750-770 标题和配置选择
+        setupDisplayModeSelection()      // Y: 700-720 显示器配置模式选择（二选一）
+        setupAutoDetectionControls()     // Y: 650-690 自动检测区域
+        setupManualDisplaySelection()    // Y: 520-640 手动显示器选择区域
+        setupResolutionControls()        // Y: 460-510 分辨率设置
+        setupHiDPIControls()            // Y: 400-450 HiDPI设置
+        setupCompressionControls()       // Y: 360-390 压缩设置
+        setupQualityControls()          // Y: 320-350 质量设置
+        setupEffectControls()           // Y: 280-310 特效设置
+        setupAdvancedDisplayControls()  // Y: 220-270 高级显示设置
+        setupActionButtons()            // Y: 160-190 操作按钮
+        setupStatusLabel()              // Y: 130-150 状态标签
     }
     
-    private func setupDisplaySelection() {
-        // 显示器选择区域标题
+    private func setupManualDisplaySelection() {
+        // 手动显示器选择区域标题
         let displaySectionLabel = NSTextField(labelWithString: "手动显示器选择")
         displaySectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        displaySectionLabel.frame = NSRect(x: 20, y: 620, width: 150, height: 20)
+        displaySectionLabel.frame = NSRect(x: 40, y: 620, width: 150, height: 20)
         view.addSubview(displaySectionLabel)
         
         // 显示器选择下拉菜单
         displaySelectionPopup = NSPopUpButton()
         displaySelectionPopup.target = self
         displaySelectionPopup.action = #selector(displaySelectionChanged(_:))
-        displaySelectionPopup.frame = NSRect(x: 20, y: 590, width: 320, height: 25)
+        displaySelectionPopup.frame = NSRect(x: 40, y: 590, width: 320, height: 25)
         view.addSubview(displaySelectionPopup)
         
         // 应用推荐按钮（显示器右侧）
         let applyDisplayConfigButton = NSButton(title: "应用推荐", target: self, action: #selector(applySelectedDisplayConfig(_:)))
         applyDisplayConfigButton.bezelStyle = .rounded
-        applyDisplayConfigButton.frame = NSRect(x: 350, y: 590, width: 80, height: 25)
+        applyDisplayConfigButton.frame = NSRect(x: 370, y: 590, width: 80, height: 25)
         applyDisplayConfigButton.toolTip = "应用选定显示器的推荐RDP配置"
         view.addSubview(applyDisplayConfigButton)
         
         // 刷新显示器按钮
         refreshDisplaysButton = NSButton(title: "刷新", target: self, action: #selector(refreshDisplays(_:)))
         refreshDisplaysButton.bezelStyle = .rounded
-        refreshDisplaysButton.frame = NSRect(x: 440, y: 590, width: 60, height: 25)
+        refreshDisplaysButton.frame = NSRect(x: 460, y: 590, width: 60, height: 25)
         view.addSubview(refreshDisplaysButton)
         
-        // 显示器信息面板（调整位置避免重叠）
+        // 显示器信息面板
         displayInfoPanel = NSView()
-        displayInfoPanel.frame = NSRect(x: 20, y: 480, width: 540, height: 100)
+        displayInfoPanel.frame = NSRect(x: 40, y: 520, width: 520, height: 60)
         displayInfoPanel.wantsLayer = true
         displayInfoPanel.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         displayInfoPanel.layer?.cornerRadius = 6
@@ -168,43 +169,41 @@ public class RDPSettingsViewController: NSViewController {
         // 显示器名称标签
         displayNameLabel = NSTextField(labelWithString: "未选择显示器")
         displayNameLabel.font = NSFont.boldSystemFont(ofSize: 12)
-        displayNameLabel.frame = NSRect(x: 10, y: 75, width: 520, height: 20)
+        displayNameLabel.frame = NSRect(x: 10, y: 35, width: 500, height: 20)
         displayInfoPanel.addSubview(displayNameLabel)
         
         // 显示器规格标签
         displaySpecsLabel = NSTextField(labelWithString: "请选择显示器以查看详细信息")
         displaySpecsLabel.font = NSFont.systemFont(ofSize: 11)
         displaySpecsLabel.textColor = NSColor.secondaryLabelColor
-        displaySpecsLabel.frame = NSRect(x: 10, y: 55, width: 520, height: 15)
+        displaySpecsLabel.frame = NSRect(x: 10, y: 15, width: 500, height: 15)
         displayInfoPanel.addSubview(displaySpecsLabel)
         
         // 推荐配置标签
         recommendationLabel = NSTextField(labelWithString: "")
         recommendationLabel.font = NSFont.systemFont(ofSize: 11)
         recommendationLabel.textColor = NSColor.systemBlue
-        recommendationLabel.frame = NSRect(x: 10, y: 35, width: 520, height: 15)
+        recommendationLabel.frame = NSRect(x: 10, y: 0, width: 500, height: 15)
         displayInfoPanel.addSubview(recommendationLabel)
         
-        // 详细信息标签
-        let detailInfoLabel = NSTextField(labelWithString: "")
-        detailInfoLabel.font = NSFont.systemFont(ofSize: 10)
-        detailInfoLabel.textColor = NSColor.tertiaryLabelColor
-        detailInfoLabel.frame = NSRect(x: 10, y: 15, width: 520, height: 15)
-        displayInfoPanel.addSubview(detailInfoLabel)
+        // 存储手动选择相关控件的引用（使用不同方式标记控件）
+        displaySectionLabel.identifier = NSUserInterfaceItemIdentifier("manualDisplayLabel")
+        displaySelectionPopup.identifier = NSUserInterfaceItemIdentifier("manualDisplayPopup")
+        displayInfoPanel.identifier = NSUserInterfaceItemIdentifier("manualDisplayPanel")
         
-        logInfo("📺 显示器选择界面初始化完成，默认未选择显示器")
+        logInfo("📺 手动显示器选择界面初始化完成")
     }
     
     private func setupTitleAndProfile() {
         // 标题
         let titleLabel = NSTextField(labelWithString: "RDP连接设置")
         titleLabel.font = NSFont.boldSystemFont(ofSize: 16)
-        titleLabel.frame = NSRect(x: 20, y: 680, width: 200, height: 20)
+        titleLabel.frame = NSRect(x: 20, y: 750, width: 200, height: 20)
         view.addSubview(titleLabel)
         
         // 配置文件选择
         let profileLabel = NSTextField(labelWithString: "质量配置:")
-        profileLabel.frame = NSRect(x: 300, y: 680, width: 80, height: 20)
+        profileLabel.frame = NSRect(x: 350, y: 750, width: 80, height: 20)
         view.addSubview(profileLabel)
         
         profileSegmentedControl = NSSegmentedControl()
@@ -215,16 +214,52 @@ public class RDPSettingsViewController: NSViewController {
         profileSegmentedControl.selectedSegment = 1
         profileSegmentedControl.target = self
         profileSegmentedControl.action = #selector(profileChanged(_:))
-        profileSegmentedControl.frame = NSRect(x: 380, y: 680, width: 180, height: 25)
+        profileSegmentedControl.frame = NSRect(x: 430, y: 750, width: 150, height: 25)
         view.addSubview(profileSegmentedControl)
     }
     
-    private func setupAutoDetectionControls() {
-        // 自动检测选项 - 放在第一行，对应useAutoDetection配置
-        autoDetectionCheckbox = NSButton(checkboxWithTitle: "自动检测显示器配置", target: self, action: #selector(autoDetectionChanged(_:)))
-        autoDetectionCheckbox.frame = NSRect(x: 20, y: 650, width: 200, height: 20)
+    private func setupDisplayModeSelection() {
+        // 显示器配置模式选择区域
+        let modeSelectionLabel = NSTextField(labelWithString: "显示器配置模式")
+        modeSelectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
+        modeSelectionLabel.frame = NSRect(x: 20, y: 720, width: 150, height: 20)
+        view.addSubview(modeSelectionLabel)
+        
+        // 自动检测选项
+        autoDetectionCheckbox = NSButton(checkboxWithTitle: "自动检测显示器配置", target: self, action: #selector(displayModeChanged(_:)))
+        autoDetectionCheckbox.frame = NSRect(x: 20, y: 695, width: 200, height: 20)
         autoDetectionCheckbox.state = .on  // 默认启用
         view.addSubview(autoDetectionCheckbox)
+        
+        // 手动设置选项
+        let manualModeCheckbox = NSButton(checkboxWithTitle: "手动选择显示器和分辨率", target: self, action: #selector(displayModeChanged(_:)))
+        manualModeCheckbox.frame = NSRect(x: 250, y: 695, width: 200, height: 20)
+        manualModeCheckbox.state = .off
+        view.addSubview(manualModeCheckbox)
+        
+        // 存储手动模式复选框的引用
+        manualModeCheckbox.tag = 1001 // 用于识别
+        autoDetectionCheckbox.tag = 1000
+    }
+    
+    private func setupAutoDetectionControls() {
+        // 自动检测区域（仅在启用自动检测时显示）
+        let autoDetectionLabel = NSTextField(labelWithString: "自动检测配置")
+        autoDetectionLabel.font = NSFont.boldSystemFont(ofSize: 12)
+        autoDetectionLabel.frame = NSRect(x: 40, y: 665, width: 120, height: 20)
+        autoDetectionLabel.textColor = NSColor.systemBlue
+        view.addSubview(autoDetectionLabel)
+        
+        // 自动检测说明
+        let autoDetectionInfo = NSTextField(labelWithString: "系统将自动检测主显示器配置并应用最佳RDP设置")
+        autoDetectionInfo.font = NSFont.systemFont(ofSize: 11)
+        autoDetectionInfo.textColor = NSColor.secondaryLabelColor
+        autoDetectionInfo.frame = NSRect(x: 40, y: 645, width: 500, height: 15)
+        view.addSubview(autoDetectionInfo)
+        
+        // 存储自动检测相关控件的引用
+        autoDetectionLabel.identifier = NSUserInterfaceItemIdentifier("autoDetectionLabel")
+        autoDetectionInfo.identifier = NSUserInterfaceItemIdentifier("autoDetectionInfo")
     }
     
 
@@ -1266,6 +1301,69 @@ public class RDPSettingsViewController: NSViewController {
     @objc private func advancedControlChanged(_ sender: NSControl) {
         settingsChanged()
         updateStatusLabel("高级显示设置已更改")
+    }
+    
+    @objc private func displayModeChanged(_ sender: NSButton) {
+        // 实现二选一逻辑
+        if sender.tag == 1000 { // 自动检测
+            if sender.state == .on {
+                // 启用自动检测，禁用手动模式
+                if let manualCheckbox = view.viewWithTag(1001) as? NSButton {
+                    manualCheckbox.state = .off
+                }
+                showAutoDetectionControls(true)
+                showManualDisplayControls(false)
+                updateStatusLabel("已切换到自动检测模式")
+            }
+        } else if sender.tag == 1001 { // 手动模式
+            if sender.state == .on {
+                // 启用手动模式，禁用自动检测
+                if let autoCheckbox = view.viewWithTag(1000) as? NSButton {
+                    autoCheckbox.state = .off
+                }
+                showAutoDetectionControls(false)
+                showManualDisplayControls(true)
+                updateStatusLabel("已切换到手动设置模式")
+            }
+        }
+        
+        // 确保至少有一个选项被选中
+        let autoCheckbox = view.viewWithTag(1000) as? NSButton
+        let manualCheckbox = view.viewWithTag(1001) as? NSButton
+        
+        if autoCheckbox?.state == .off && manualCheckbox?.state == .off {
+            // 如果都没选中，默认选中自动检测
+            autoCheckbox?.state = .on
+            showAutoDetectionControls(true)
+            showManualDisplayControls(false)
+        }
+        
+        settingsChanged()
+    }
+    
+    private func showAutoDetectionControls(_ show: Bool) {
+        // 显示/隐藏自动检测相关控件
+        view.subviews.forEach { subview in
+            if let identifier = subview.identifier?.rawValue,
+               identifier.hasPrefix("autoDetection") {
+                subview.isHidden = !show
+            }
+        }
+    }
+    
+    private func showManualDisplayControls(_ show: Bool) {
+        // 显示/隐藏手动显示器选择相关控件
+        view.subviews.forEach { subview in
+            if let identifier = subview.identifier?.rawValue,
+               identifier.hasPrefix("manualDisplay") {
+                subview.isHidden = !show
+            }
+        }
+        
+        // 特别处理主要控件
+        displaySelectionPopup?.isHidden = !show
+        refreshDisplaysButton?.isHidden = !show
+        displayInfoPanel?.isHidden = !show
     }
     
     @objc private func saveSettings(_ sender: NSButton) {
