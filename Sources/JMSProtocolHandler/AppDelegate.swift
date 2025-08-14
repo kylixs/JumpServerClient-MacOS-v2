@@ -25,7 +25,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - 应用程序生命周期
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("JMS Protocol Handler 已启动")
+        print("🚀 JMS Protocol Handler 已启动")
+        print("📋 启动时间: \(Date())")
+        
+        // 打印所有命令行参数
+        let arguments = CommandLine.arguments
+        print("📝 命令行参数总数: \(arguments.count)")
+        for (index, argument) in arguments.enumerated() {
+            print("📝 参数[\(index)]: \(argument)")
+        }
         
         // 设置应用程序为普通应用，显示在Dock中
         NSApp.setActivationPolicy(.regular)
@@ -37,14 +45,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMainMenu()
         
         // 注册URL事件处理
+        print("🔗 注册Apple Events URL处理器...")
         NSAppleEventManager.shared().setEventHandler(
             self,
             andSelector: #selector(handleURLEvent(_:withReplyEvent:)),
             forEventClass: AEEventClass(kInternetEventClass),
             andEventID: AEEventID(kAEGetURL)
         )
+        print("✅ Apple Events URL处理器注册完成")
         
         // 检查是否有命令行参数传入的URL
+        print("🔍 开始检查命令行参数...")
         handleCommandLineArguments()
         
         // 确保应用程序激活
@@ -53,7 +64,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let arguments = CommandLine.arguments
             let hasURLArgument = arguments.contains { $0.hasPrefix("jms://") }
             
+            print("🎯 检查是否需要激活应用程序: hasURLArgument=\(hasURLArgument)")
             if hasURLArgument {
+                print("🎯 激活应用程序...")
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
@@ -424,58 +437,87 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - URL事件处理
     
     @objc func handleURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
+        print("🎯 handleURLEvent() 被调用")
+        print("📅 事件时间: \(Date())")
+        print("📋 事件描述: \(event)")
+        
         guard let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue else {
+            print("❌ 无法从Apple Event中获取URL参数")
             errorHandler.handleJMSError(.invalidURL("无法获取URL参数"))
             return
         }
         
-        print("接收到URL: \(urlString)")
+        print("✅ 从Apple Event接收到URL: \(urlString)")
         processJMSURL(urlString)
     }
     
     private func handleCommandLineArguments() {
         let arguments = CommandLine.arguments
+        print("🔍 handleCommandLineArguments() 开始执行")
+        print("📝 当前命令行参数: \(arguments)")
         
         // 查找URL参数
-        for argument in arguments {
+        var foundJMSURL = false
+        for (index, argument) in arguments.enumerated() {
+            print("🔍 检查参数[\(index)]: \(argument)")
             if argument.hasPrefix("jms://") {
-                print("从命令行接收到URL: \(argument)")
+                print("✅ 发现JMS URL参数: \(argument)")
+                foundJMSURL = true
                 processJMSURL(argument)
                 return
             }
         }
         
+        if !foundJMSURL {
+            print("❌ 未发现JMS URL参数")
+        }
+        
         // 如果没有URL参数，显示状态信息
         if arguments.count <= 1 {
+            print("📊 参数数量 <= 1，显示状态信息")
             showStatusInfo()
+        } else {
+            print("📊 参数数量 > 1 但无JMS URL，不显示状态信息")
         }
     }
     
     // MARK: - JMS URL处理
     
     private func processJMSURL(_ urlString: String) {
+        print("🔄 processJMSURL() 开始处理: \(urlString)")
+        print("📅 处理时间: \(Date())")
+        
         do {
             // 1. 解析URL
+            print("🔍 步骤1: 解析URL...")
             let urlComponents = try urlParser.parseURL(urlString)
-            print("URL解析成功: \(urlComponents.scheme)://...")
+            print("✅ URL解析成功: \(urlComponents.scheme)://...")
             
             // 2. 解码payload
+            print("🔍 步骤2: 解码payload...")
             let config = try payloadDecoder.decodePayload(urlComponents.encodedPayload)
-            print("Payload解码成功，协议类型: \(config.protocolType)")
+            print("✅ Payload解码成功，协议类型: \(config.protocolType)")
             
             // 3. 提取连接信息
+            print("🔍 步骤3: 提取连接信息...")
             let connectionInfo = try connectionInfoExtractor.extractConnectionInfo(from: config)
-            print("连接信息提取成功")
+            print("✅ 连接信息提取成功")
             
             // 4. 根据协议类型启动相应的连接
+            print("🔍 步骤4: 启动连接...")
             switch connectionInfo {
             case .rdp(let rdpInfo):
+                print("🖥️ 启动RDP连接...")
                 try handleRDPConnection(rdpInfo)
             case .ssh(let sshInfo):
+                print("💻 启动SSH连接...")
                 try handleSSHConnection(sshInfo)
             }
             
+            print("🎉 JMS URL处理完成")
+            
         } catch {
+            print("❌ JMS URL处理失败: \(error)")
             // 按需求文档要求：直接处理错误，不显示弹框提示
             errorHandler.handleError(error, context: "处理JMS URL: \(urlString)", showAlert: false)
         }
