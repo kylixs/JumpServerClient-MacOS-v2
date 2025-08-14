@@ -73,8 +73,9 @@ public class RemoteDesktopIntegrator {
         // 5. 发送成功通知
         NotificationManager.shared.showRDPConnectionSuccess(connectionInfo)
         
-        // 6. 清理临时文件（延迟执行）
-        scheduleFileCleanup(rdpFile)
+        // 6. 保留临时文件（不自动清理）
+        // scheduleFileCleanup(rdpFile) // 已禁用自动清理
+        logInfo("📁 RDP配置文件已保存: \(rdpFile.path)")
         logInfo("🎉 RDP连接启动流程完成")
     }
     
@@ -235,10 +236,12 @@ public class RemoteDesktopIntegrator {
     }
     
     private func scheduleFileCleanup(_ fileURL: URL) {
-        // 30秒后清理临时文件
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 30.0) {
-            try? FileManager.default.removeItem(at: fileURL)
-        }
+        // 临时文件清理已禁用 - 保留文件供调试和重用
+        logInfo("📁 RDP配置文件保留: \(fileURL.path)")
+        // 原来的清理逻辑已注释：
+        // DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 30.0) {
+        //     try? FileManager.default.removeItem(at: fileURL)
+        // }
     }
     
     // MARK: - 配置管理

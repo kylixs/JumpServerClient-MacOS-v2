@@ -161,8 +161,9 @@ public class SSHTerminalIntegrator {
             let attributes = [FileAttributeKey.posixPermissions: 0o755]
             try FileManager.default.setAttributes(attributes, ofItemAtPath: fileURL.path)
             
-            // 安排清理
-            scheduleFileCleanup(fileURL)
+            // 安排保留文件（不自动清理）
+            // scheduleFileCleanup(fileURL) // 已禁用自动清理
+            logInfo("📁 SSH expect脚本已保存: \(fileURL.path)")
             
             return fileURL
         } catch {
@@ -216,10 +217,12 @@ public class SSHTerminalIntegrator {
     }
     
     private func scheduleFileCleanup(_ fileURL: URL) {
-        // 30秒后清理临时文件
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 30.0) {
-            try? FileManager.default.removeItem(at: fileURL)
-        }
+        // 临时文件清理已禁用 - 保留文件供调试和重用
+        logInfo("📁 SSH临时文件保留: \(fileURL.path)")
+        // 原来的清理逻辑已注释：
+        // DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 30.0) {
+        //     try? FileManager.default.removeItem(at: fileURL)
+        // }
     }
 }
 
