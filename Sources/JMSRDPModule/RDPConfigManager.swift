@@ -44,15 +44,15 @@ public class RDPConfigManager {
     /// - Returns: 完整的RDP配置文件内容
     /// - Throws: JMSError.configurationError
     public func generateOptimizedConfig(for connectionInfo: RDPConnectionInfo, quality: QualityProfile? = nil) throws -> String {
-        // 1. 检测显示器配置
-        let displayConfig = try displayDetector.detectPrimaryDisplay()
+        // 1. 检测显示器配置 - 获取逻辑分辨率作为基础配置
+        let displayConfig = try displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
         
         // 2. 应用质量配置
         let qualityProfile = quality ?? currentQualityProfile
         let settings = RDPSettingsModel.convertFromQualityProfile(qualityProfile)
         let optimizedSettings = optimizeSettings(for: displayConfig, settings: settings)
         
-        // 3. 生成RDP配置文件
+        // 3. 生成RDP配置文件 - 内部会根据自动检测和HiDPI设置决定最终分辨率
         return generateRDPConfigFile(connectionInfo: connectionInfo, settings: optimizedSettings, displayConfig: displayConfig)
     }
     
@@ -136,20 +136,41 @@ public class RDPConfigManager {
         configLines.append("full address:s:\(connectionInfo.serverAddress)")
         configLines.append("username:s:\(connectionInfo.username)")
         
-        // 显示设置 - 优先使用用户配置的分辨率
+        // 显示设置 - 根据自动检测和HiDPI设置决定分辨率策略
         let finalWidth: Int
         let finalHeight: Int
+        let finalScaleFactor: Double
         
         if settings.useAutoDetection {
-            // 如果启用自动检测，使用检测到的分辨率
-            finalWidth = displayConfig.width
-            finalHeight = displayConfig.height
-            logInfo("🔧 使用自动检测分辨率: \(finalWidth)×\(finalHeight)")
+            // 启用自动检测时的逻辑
+            if settings.hiDPI.enabled {
+                // 开启HiDPI：使用原生分辨率 + 最佳缩放因子
+                do {
+                    let nativeDisplayConfig = try displayDetector.detectPrimaryDisplay(useLogicalResolution: false)
+                    finalWidth = nativeDisplayConfig.width
+                    finalHeight = nativeDisplayConfig.height
+                    finalScaleFactor = nativeDisplayConfig.scaleFactor
+                    logInfo("🔧 自动检测+HiDPI: 使用原生分辨率 \(finalWidth)×\(finalHeight), 缩放因子: \(finalScaleFactor)")
+                } catch {
+                    // 如果获取原生分辨率失败，回退到逻辑分辨率
+                    finalWidth = displayConfig.width
+                    finalHeight = displayConfig.height
+                    finalScaleFactor = displayConfig.scaleFactor
+                    logInfo("🔧 自动检测+HiDPI: 原生分辨率获取失败，使用逻辑分辨率 \(finalWidth)×\(finalHeight)")
+                }
+            } else {
+                // 不开启HiDPI：使用逻辑分辨率
+                finalWidth = displayConfig.width
+                finalHeight = displayConfig.height
+                finalScaleFactor = 1.0  // 不使用缩放
+                logInfo("🔧 自动检测+无HiDPI: 使用逻辑分辨率 \(finalWidth)×\(finalHeight)")
+            }
         } else {
-            // 否则使用用户配置的分辨率
+            // 未启用自动检测：使用用户配置的分辨率和参数
             finalWidth = settings.resolution.width
             finalHeight = settings.resolution.height
-            logInfo("🔧 使用用户配置分辨率: \(finalWidth)×\(finalHeight) (配置: \(settings.resolution.displayName))")
+            finalScaleFactor = settings.hiDPI.enabled ? settings.hiDPI.scaleFactor : 1.0
+            logInfo("🔧 手动配置: 使用用户设置 \(finalWidth)×\(finalHeight), HiDPI: \(settings.hiDPI.enabled), 缩放: \(finalScaleFactor)")
         }
         
         configLines.append("desktopwidth:i:\(finalWidth)")
@@ -173,10 +194,12 @@ public class RDPConfigManager {
         configLines.append("smart sizing:i:1")
         configLines.append("screen mode id:i:2")
         
-        // HiDPI设置
-        if settings.hiDPI.enabled {
-            configLines.append("desktopscalefactor:i:\(Int(settings.hiDPI.scaleFactor * 100))")
+        // HiDPI设置 - 根据最终决定的缩放因子设置
+        if (settings.useAutoDetection && settings.hiDPI.enabled) || (!settings.useAutoDetection && settings.hiDPI.enabled) {
+            let scaleFactorPercent = Int(finalScaleFactor * 100)
+            configLines.append("desktopscalefactor:i:\(scaleFactorPercent)")
             configLines.append("hidef color depth:i:\(settings.colorDepth)")
+            logInfo("🔧 HiDPI配置: 缩放因子 \(scaleFactorPercent)%, 颜色深度 \(settings.colorDepth)位")
         }
         
         return configLines.joined(separator: "\n")

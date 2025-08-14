@@ -533,7 +533,7 @@ public class RDPSettingsViewController: NSViewController {
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
-                let displays = try self?.displayDetector.detectAllDisplays() ?? []
+                let displays = try self?.displayDetector.detectAllDisplays(useLogicalResolution: true) ?? []
                 
                 DispatchQueue.main.async {
                     self?.allDisplays = displays
@@ -553,7 +553,7 @@ public class RDPSettingsViewController: NSViewController {
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
-                let displays = try self?.displayDetector.detectAllDisplays() ?? []
+                let displays = try self?.displayDetector.detectAllDisplays(useLogicalResolution: true) ?? []
                 
                 DispatchQueue.main.async {
                     self?.allDisplays = displays
@@ -834,7 +834,7 @@ public class RDPSettingsViewController: NSViewController {
     private func detectCurrentDisplay() {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
-                let displayConfig = try self?.displayDetector.detectPrimaryDisplay()
+                let displayConfig = try self?.displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
                 
                 DispatchQueue.main.async {
                     if let config = displayConfig {
@@ -923,7 +923,7 @@ public class RDPSettingsViewController: NSViewController {
         if isAutoDetectionEnabled {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 do {
-                    let displayConfig = try self?.displayDetector.detectPrimaryDisplay()
+                    let displayConfig = try self?.displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
                     
                     DispatchQueue.main.async {
                         if let config = displayConfig {
@@ -987,7 +987,7 @@ public class RDPSettingsViewController: NSViewController {
     
     @objc private func applyRecommendedSettings(_ sender: NSButton) {
         do {
-            let displayConfig = try displayDetector.detectPrimaryDisplay()
+            let displayConfig = try displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
             applyDisplayConfiguration(displayConfig)
             updateStatusLabel("已应用推荐设置")
         } catch {

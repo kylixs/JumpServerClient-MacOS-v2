@@ -8,20 +8,22 @@ public class DisplayDetector {
     public init() {}
     
     /// 检测主显示器配置
+    /// - Parameter useLogicalResolution: 是否使用逻辑分辨率而不是原生分辨率
     /// - Returns: 主显示器的配置信息
     /// - Throws: JMSError.displayDetectionFailed
-    public func detectPrimaryDisplay() throws -> DisplayConfiguration {
+    public func detectPrimaryDisplay(useLogicalResolution: Bool = true) throws -> DisplayConfiguration {
         guard let mainDisplayID = getMainDisplayID() else {
             throw JMSError.displayDetectionFailed("无法获取主显示器ID")
         }
         
-        return try detectDisplay(displayID: mainDisplayID)
+        return try detectDisplay(displayID: mainDisplayID, useLogicalResolution: useLogicalResolution)
     }
     
     /// 检测所有显示器配置
+    /// - Parameter useLogicalResolution: 是否使用逻辑分辨率而不是原生分辨率
     /// - Returns: 所有显示器的配置信息数组
     /// - Throws: JMSError.displayDetectionFailed
-    public func detectAllDisplays() throws -> [DisplayConfiguration] {
+    public func detectAllDisplays(useLogicalResolution: Bool = true) throws -> [DisplayConfiguration] {
         let maxDisplays: UInt32 = 32
         var displayIDs = [CGDirectDisplayID](repeating: 0, count: Int(maxDisplays))
         var displayCount: UInt32 = 0
@@ -35,7 +37,7 @@ public class DisplayDetector {
         
         for i in 0..<Int(displayCount) {
             do {
-                let config = try detectDisplay(displayID: displayIDs[i])
+                let config = try detectDisplay(displayID: displayIDs[i], useLogicalResolution: useLogicalResolution)
                 configurations.append(config)
             } catch {
                 // 跳过检测失败的显示器，继续检测其他显示器
@@ -51,12 +53,14 @@ public class DisplayDetector {
     }
     
     /// 检测指定显示器的配置
-    /// - Parameter displayID: 显示器ID
+    /// - Parameters:
+    ///   - displayID: 显示器ID
+    ///   - useLogicalResolution: 是否使用逻辑分辨率而不是原生分辨率
     /// - Returns: 显示器配置信息
     /// - Throws: JMSError.displayDetectionFailed
-    public func detectDisplay(displayID: CGDirectDisplayID) throws -> DisplayConfiguration {
+    public func detectDisplay(displayID: CGDirectDisplayID, useLogicalResolution: Bool = true) throws -> DisplayConfiguration {
         // 获取物理分辨率和缩放信息
-        let (physicalWidth, physicalHeight, scaleFactor, isHiDPI) = try getPhysicalResolutionAndScale(displayID: displayID)
+        let (physicalWidth, physicalHeight, scaleFactor, isHiDPI) = try getPhysicalResolutionAndScale(displayID: displayID, useLogicalResolution: useLogicalResolution)
         
         // 获取刷新率
         let refreshRate = getRefreshRate(displayID: displayID)
@@ -107,10 +111,12 @@ public class DisplayDetector {
     }
     
     /// 获取物理分辨率和缩放因子
-    /// - Parameter displayID: 显示器ID
-    /// - Returns: (物理宽度, 物理高度, 缩放因子, 是否HiDPI)
+    /// - Parameters:
+    ///   - displayID: 显示器ID
+    ///   - useLogicalResolution: 是否使用逻辑分辨率
+    /// - Returns: (宽度, 高度, 缩放因子, 是否HiDPI)
     /// - Throws: JMSError.displayDetectionFailed
-    private func getPhysicalResolutionAndScale(displayID: CGDirectDisplayID) throws -> (Int, Int, Double, Bool) {
+    private func getPhysicalResolutionAndScale(displayID: CGDirectDisplayID, useLogicalResolution: Bool = true) throws -> (Int, Int, Double, Bool) {
         // 方法1: 尝试获取原生分辨率
         if let nativeMode = getNativeDisplayMode(displayID: displayID) {
             let nativeWidth = Int(nativeMode.width)
@@ -129,9 +135,14 @@ public class DisplayDetector {
             // 判断是否为HiDPI (缩放因子 > 1.5)
             let isHiDPI = scaleFactor > 1.5
             
-            print("🔍 显示器检测 - 原生: \(nativeWidth)×\(nativeHeight), 逻辑: \(logicalWidth)×\(logicalHeight), 缩放: \(scaleFactor)")
+            // 根据参数决定返回原生分辨率还是逻辑分辨率
+            let finalWidth = useLogicalResolution ? logicalWidth : nativeWidth
+            let finalHeight = useLogicalResolution ? logicalHeight : nativeHeight
             
-            return (nativeWidth, nativeHeight, scaleFactor, isHiDPI)
+            print("🔍 显示器检测 - 原生: \(nativeWidth)×\(nativeHeight), 逻辑: \(logicalWidth)×\(logicalHeight), 缩放: \(scaleFactor)")
+            print("🔧 返回分辨率: \(finalWidth)×\(finalHeight) (使用\(useLogicalResolution ? "逻辑" : "原生")分辨率)")
+            
+            return (finalWidth, finalHeight, scaleFactor, isHiDPI)
         }
         
         // 方法2: 使用DPI计算 (备用方法)
