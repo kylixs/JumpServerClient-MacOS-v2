@@ -20,44 +20,43 @@ public class RemoteDesktopIntegrator {
     ///   - qualityProfile: 质量配置文件（可选）
     /// - Throws: JMSError相关错误
     public func launchRDPConnection(_ connectionInfo: RDPConnectionInfo, quality: QualityProfile? = nil) throws {
-        print("🔍 RemoteDesktopIntegrator: 开始启动RDP连接")
-        print("🔍 服务器地址: \(connectionInfo.serverAddress)")
-        print("🔍 用户名: \(connectionInfo.username)")
+        logInfo("🔍 RemoteDesktopIntegrator: 开始启动RDP连接")
+        logInfo("🔍 服务器地址: \(connectionInfo.serverAddress)")
+        logInfo("🔍 用户名: \(connectionInfo.username)")
         
         // 1. 检查Microsoft Remote Desktop是否已安装
-        print("🔍 步骤1: 检查Microsoft Remote Desktop安装...")
+        logInfo("🔍 步骤1: 检查Microsoft Remote Desktop安装...")
         try verifyRemoteDesktopInstallation()
-        print("✅ Microsoft Remote Desktop 已安装")
+        logInfo("✅ Microsoft Remote Desktop 已安装")
         
         // 2. 生成优化的RDP配置
-        print("🔍 步骤2: 生成RDP配置...")
+        logInfo("🔍 步骤2: 生成RDP配置...")
         let configContent = try configManager.generateOptimizedConfig(for: connectionInfo, quality: quality)
-        print("✅ RDP配置生成成功")
-        print("📄 配置内容预览:")
-        print(configContent.prefix(200) + (configContent.count > 200 ? "..." : ""))
+        logInfo("✅ RDP配置生成成功")
+        logDebug("📄 配置内容预览: \(configContent.prefix(200))\(configContent.count > 200 ? "..." : "")")
         
         // 3. 创建临时RDP文件
-        print("🔍 步骤3: 创建临时RDP文件...")
+        logInfo("🔍 步骤3: 创建临时RDP文件...")
         let rdpFile = try createTemporaryRDPFile(content: configContent, connectionInfo: connectionInfo)
-        print("✅ 临时RDP文件创建成功: \(rdpFile.path)")
+        logInfo("✅ 临时RDP文件创建成功: \(rdpFile.path)")
         
         // 4. 启动Microsoft Remote Desktop
-        print("🔍 步骤4: 启动Microsoft Remote Desktop...")
+        logInfo("🔍 步骤4: 启动Microsoft Remote Desktop...")
         try launchRemoteDesktop(with: rdpFile)
-        print("✅ Microsoft Remote Desktop 启动成功")
+        logInfo("✅ Microsoft Remote Desktop 启动成功")
         
         // 5. 发送成功通知
         NotificationManager.shared.showRDPConnectionSuccess(connectionInfo)
         
         // 6. 清理临时文件（延迟执行）
         scheduleFileCleanup(rdpFile)
-        print("🎉 RDP连接启动流程完成")
+        logInfo("🎉 RDP连接启动流程完成")
     }
     
     /// 验证Microsoft Remote Desktop是否已安装
     /// - Throws: JMSError.remoteDesktopNotFound
     public func verifyRemoteDesktopInstallation() throws {
-        print("🔍 检查Microsoft Remote Desktop安装状态...")
+        logDebug("🔍 检查Microsoft Remote Desktop安装状态...")
         
         let possiblePaths = [
             "/Applications/Microsoft Remote Desktop.app",
@@ -67,21 +66,21 @@ public class RemoteDesktopIntegrator {
         
         let fileManager = FileManager.default
         for path in possiblePaths {
-            print("🔍 检查路径: \(path)")
+            logDebug("🔍 检查路径: \(path)")
             if fileManager.fileExists(atPath: path) {
-                print("✅ 在路径找到Microsoft Remote Desktop: \(path)")
+                logDebug("✅ 在路径找到Microsoft Remote Desktop: \(path)")
                 return // 找到了应用程序
             }
         }
         
         // 尝试通过Bundle ID查找
-        print("🔍 通过Bundle ID查找: com.microsoft.rdc.macos")
+        logDebug("🔍 通过Bundle ID查找: com.microsoft.rdc.macos")
         if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") {
-            print("✅ 通过Bundle ID找到Microsoft Remote Desktop: \(appURL.path)")
+            logDebug("✅ 通过Bundle ID找到Microsoft Remote Desktop: \(appURL.path)")
             return // 通过Bundle ID找到了
         }
         
-        print("❌ 未找到Microsoft Remote Desktop应用程序")
+        logError("❌ 未找到Microsoft Remote Desktop应用程序")
         throw JMSError.remoteDesktopNotFound
     }
     
@@ -124,6 +123,14 @@ public class RemoteDesktopIntegrator {
         let timestamp = Int(Date().timeIntervalSince1970)
         let fileName = "rdp_connection_\(timestamp).rdp"
         let fileURL = tempDirectory.appendingPathComponent(fileName)
+        
+        // 使用LogManager记录RDP配置到专门的日志文件
+        LogManager.shared.logRDPConfig(
+            server: connectionInfo.serverAddress,
+            username: connectionInfo.username,
+            filePath: fileURL.path,
+            configContent: content
+        )
         
         do {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
