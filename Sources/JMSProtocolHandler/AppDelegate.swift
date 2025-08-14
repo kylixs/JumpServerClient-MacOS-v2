@@ -4,6 +4,15 @@ import JMSCore
 import JMSRDPModule
 import JMSSSHModule
 
+// MARK: - DateFormatter扩展
+extension DateFormatter {
+    static let logFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return formatter
+    }()
+}
+
 /// 应用程序委托
 class AppDelegate: NSObject, NSApplicationDelegate {
     
@@ -11,6 +20,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var rdpSettingsWindow: NSWindow?
     private var rdpSettingsViewController: RDPSettingsViewController?
+    
+    // URL处理标志
+    private var hasProcessedURL = false
+    
+    // 日志文件路径
+    private let logFileURL: URL = {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return documentsPath.appendingPathComponent("JMSProtocolHandler.log")
+    }()
     
     // 服务组件
     private let urlParser = URLParser()
@@ -22,17 +40,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let rdpConfigManager = RDPConfigManager.shared
     private let rdpSettingsManager = RDPSettingsManager.shared
     
+    // MARK: - 日志记录
+    
+    private func logMessage(_ message: String) {
+        let timestamp = DateFormatter.logFormatter.string(from: Date())
+        let logEntry = "[\(timestamp)] \(message)\n"
+        
+        // 同时输出到控制台和文件
+        print(message)
+        
+        // 写入日志文件
+        if let data = logEntry.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logFileURL.path) {
+                if let fileHandle = try? FileHandle(forWritingTo: logFileURL) {
+                    fileHandle.seekToEndOfFile()
+                    fileHandle.write(data)
+                    fileHandle.closeFile()
+                }
+            } else {
+                try? data.write(to: logFileURL)
+            }
+        }
+    }
+    
     // MARK: - 应用程序生命周期
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("🚀 JMS Protocol Handler 已启动")
-        print("📋 启动时间: \(Date())")
+        logMessage("🚀 JMS Protocol Handler 已启动")
+        logMessage("📋 启动时间: \(Date())")
+        logMessage("📁 日志文件位置: \(logFileURL.path)")
         
         // 打印所有命令行参数
         let arguments = CommandLine.arguments
-        print("📝 命令行参数总数: \(arguments.count)")
+        logMessage("📝 命令行参数总数: \(arguments.count)")
         for (index, argument) in arguments.enumerated() {
-            print("📝 参数[\(index)]: \(argument)")
+            logMessage("📝 参数[\(index)]: \(argument)")
         }
         
         // 设置应用程序为普通应用，显示在Dock中
