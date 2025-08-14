@@ -74,18 +74,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - 应用程序生命周期
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 立即测试日志记录
-        print("🧪 测试控制台输出")
-        
-        // 测试日志文件创建
-        do {
-            let testMessage = "🧪 测试日志文件创建 - \(Date())\n"
-            try testMessage.write(to: logFileURL, atomically: true, encoding: .utf8)
-            print("✅ 日志文件创建成功: \(logFileURL.path)")
-        } catch {
-            print("❌ 日志文件创建失败: \(error)")
-        }
-        
         logMessage("🚀 JMS Protocol Handler 已启动")
         logMessage("📋 启动时间: \(Date())")
         logMessage("📁 日志文件位置: \(logFileURL.path)")
