@@ -136,9 +136,24 @@ public class RDPConfigManager {
         configLines.append("full address:s:\(connectionInfo.serverAddress)")
         configLines.append("username:s:\(connectionInfo.username)")
         
-        // 显示设置
-        configLines.append("desktopwidth:i:\(displayConfig.width)")
-        configLines.append("desktopheight:i:\(displayConfig.height)")
+        // 显示设置 - 优先使用用户配置的分辨率
+        let finalWidth: Int
+        let finalHeight: Int
+        
+        if settings.useAutoDetection {
+            // 如果启用自动检测，使用检测到的分辨率
+            finalWidth = displayConfig.width
+            finalHeight = displayConfig.height
+            logInfo("🔧 使用自动检测分辨率: \(finalWidth)×\(finalHeight)")
+        } else {
+            // 否则使用用户配置的分辨率
+            finalWidth = settings.resolution.width
+            finalHeight = settings.resolution.height
+            logInfo("🔧 使用用户配置分辨率: \(finalWidth)×\(finalHeight) (配置: \(settings.resolution.displayName))")
+        }
+        
+        configLines.append("desktopwidth:i:\(finalWidth)")
+        configLines.append("desktopheight:i:\(finalHeight)")
         configLines.append("session bpp:i:\(settings.colorDepth)")
         
         // 性能设置
@@ -157,6 +172,12 @@ public class RDPConfigManager {
         // 其他设置
         configLines.append("smart sizing:i:1")
         configLines.append("screen mode id:i:2")
+        
+        // HiDPI设置
+        if settings.hiDPI.enabled {
+            configLines.append("desktopscalefactor:i:\(Int(settings.hiDPI.scaleFactor * 100))")
+            configLines.append("hidef color depth:i:\(settings.colorDepth)")
+        }
         
         return configLines.joined(separator: "\n")
     }

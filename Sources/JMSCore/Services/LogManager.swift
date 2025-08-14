@@ -129,8 +129,8 @@ public class LogManager {
         info("📋 RDP配置生成 - 服务器: \(server), 用户: \(username)")
         info("📄 RDP文件路径: \(filePath)")
         
-        // 将详细配置写入专门的RDP配置日志文件
-        writeRDPConfigLog(server: server, username: username, filePath: filePath, configContent: configContent)
+        // 将详细配置直接写入主日志文件
+        writeRDPConfigToMainLog(server: server, username: username, filePath: filePath, configContent: configContent)
     }
     
     // MARK: - 日志管理
@@ -204,26 +204,15 @@ public class LogManager {
         }
     }
     
-    private func writeRDPConfigLog(server: String, username: String, filePath: String, configContent: String) {
-        let rdpLogDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("JMSProtocolHandler/logs")
+    private func writeRDPConfigToMainLog(server: String, username: String, filePath: String, configContent: String) {
+        // 构建RDP配置日志内容
+        var logLines: [String] = []
         
-        // 创建RDP日志目录
-        try? FileManager.default.createDirectory(at: rdpLogDirectory, withIntermediateDirectories: true, attributes: nil)
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        let timestamp = dateFormatter.string(from: Date())
-        
-        let rdpLogFileName = "rdp_config_\(timestamp).log"
-        let rdpLogFileURL = rdpLogDirectory.appendingPathComponent(rdpLogFileName)
-        
-        var logContent = ""
-        logContent += "=== RDP配置参数日志 ===\n"
-        logContent += "时间: \(Date())\n"
-        logContent += "服务器: \(server)\n"
-        logContent += "用户名: \(username)\n"
-        logContent += "RDP文件: \(filePath)\n"
-        logContent += "\n"
+        logLines.append("=== RDP配置参数详情 ===")
+        logLines.append("服务器: \(server)")
+        logLines.append("用户名: \(username)")
+        logLines.append("RDP文件: \(filePath)")
+        logLines.append("")
         
         // 解析配置参数
         let configLines = configContent.components(separatedBy: "\n")
@@ -232,14 +221,14 @@ public class LogManager {
         var connectionSettings: [String: String] = [:]
         var otherSettings: [String: String] = [:]
         
-        logContent += "完整RDP配置:\n"
-        logContent += "----------------------------------------\n"
+        logLines.append("完整RDP配置:")
+        logLines.append("----------------------------------------")
         
         for line in configLines {
             let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedLine.isEmpty { continue }
             
-            logContent += "\(trimmedLine)\n"
+            logLines.append(trimmedLine)
             
             let parts = trimmedLine.components(separatedBy: ":")
             if parts.count >= 3 {
@@ -248,7 +237,7 @@ public class LogManager {
                 
                 // 分类配置参数
                 switch key {
-                case "desktopwidth", "desktopheight", "session bpp", "smart sizing", "screen mode id":
+                case "desktopwidth", "desktopheight", "session bpp", "smart sizing", "screen mode id", "desktopscalefactor", "hidef color depth":
                     displaySettings[key] = value
                 case "compression", "font smoothing", "disable wallpaper", "disable menu anims", "disable themes":
                     performanceSettings[key] = value
@@ -260,46 +249,47 @@ public class LogManager {
             }
         }
         
-        logContent += "----------------------------------------\n\n"
+        logLines.append("----------------------------------------")
+        logLines.append("")
         
         // 分类显示配置参数
-        logContent += "显示配置:\n"
+        logLines.append("显示配置:")
         for (key, value) in displaySettings.sorted(by: { $0.key < $1.key }) {
             let description = getRDPParameterDescription(key: key, value: value)
-            logContent += "  \(key): \(value) \(description)\n"
+            logLines.append("  \(key): \(value) \(description)")
         }
-        logContent += "\n"
+        logLines.append("")
         
-        logContent += "性能配置:\n"
+        logLines.append("性能配置:")
         for (key, value) in performanceSettings.sorted(by: { $0.key < $1.key }) {
             let description = getRDPParameterDescription(key: key, value: value)
-            logContent += "  \(key): \(value) \(description)\n"
+            logLines.append("  \(key): \(value) \(description)")
         }
-        logContent += "\n"
+        logLines.append("")
         
-        logContent += "连接配置:\n"
+        logLines.append("连接配置:")
         for (key, value) in connectionSettings.sorted(by: { $0.key < $1.key }) {
             let description = getRDPParameterDescription(key: key, value: value)
-            logContent += "  \(key): \(value) \(description)\n"
+            logLines.append("  \(key): \(value) \(description)")
         }
         
         if !otherSettings.isEmpty {
-            logContent += "\n其他配置:\n"
+            logLines.append("")
+            logLines.append("其他配置:")
             for (key, value) in otherSettings.sorted(by: { $0.key < $1.key }) {
                 let description = getRDPParameterDescription(key: key, value: value)
-                logContent += "  \(key): \(value) \(description)\n"
+                logLines.append("  \(key): \(value) \(description)")
             }
         }
         
-        logContent += "\n=== 日志结束 ===\n\n"
+        logLines.append("=== RDP配置记录结束 ===")
         
-        // 写入RDP配置日志文件
-        do {
-            try logContent.write(to: rdpLogFileURL, atomically: true, encoding: .utf8)
-            info("📝 RDP配置已记录到日志: \(rdpLogFileURL.path)")
-        } catch {
-            warning("⚠️ 无法写入RDP配置日志: \(error.localizedDescription)")
+        // 将所有日志行写入主日志文件
+        for line in logLines {
+            log(line, level: .info)
         }
+        
+        info("📝 RDP配置已记录到日志")
     }
     
     private func getRDPParameterDescription(key: String, value: String) -> String {
@@ -311,6 +301,12 @@ public class LogManager {
         case "session bpp":
             let colorDesc = value == "32" ? "真彩色" : value == "24" ? "增强色" : value == "16" ? "高彩色" : "未知"
             return "(\(colorDesc), \(value)位)"
+        case "desktopscalefactor":
+            let scalePercent = Int(value) ?? 100
+            return "(桌面缩放: \(scalePercent)%)"
+        case "hidef color depth":
+            let colorDesc = value == "32" ? "真彩色" : value == "24" ? "增强色" : value == "16" ? "高彩色" : "未知"
+            return "(HiDPI颜色深度: \(colorDesc), \(value)位)"
         case "compression":
             let compDesc = value == "0" ? "无压缩" : value == "1" ? "中等压缩" : value == "2" ? "高压缩" : "未知"
             return "(\(compDesc))"
