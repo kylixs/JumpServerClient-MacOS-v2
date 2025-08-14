@@ -476,7 +476,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
         } catch {
-            errorHandler.handleError(error, context: "处理JMS URL: \(urlString)")
+            // 按需求文档要求：直接处理错误，不显示弹框提示
+            errorHandler.handleError(error, context: "处理JMS URL: \(urlString)", showAlert: false)
         }
     }
     
@@ -488,11 +489,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         print("RDP连接启动成功")
         
-        // 显示成功通知
-        showNotification(
-            title: "RDP连接已启动",
-            message: "正在连接到 \(connectionInfo.serverAddress)\n使用配置: \(rdpSettingsManager.currentSettings.profileName)"
-        )
+        // 按需求文档要求：直接处理，不显示弹框提示
     }
     
     private func handleSSHConnection(_ connectionInfo: SSHConnectionInfo) throws {
@@ -503,11 +500,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         print("SSH连接启动成功")
         
-        // 显示成功通知
-        showNotification(
-            title: "SSH连接已启动",
-            message: "正在连接到 \(connectionInfo.ip):\(connectionInfo.port)"
-        )
+        // 按需求文档要求：直接处理，不显示弹框提示
     }
     
     // MARK: - 状态信息
