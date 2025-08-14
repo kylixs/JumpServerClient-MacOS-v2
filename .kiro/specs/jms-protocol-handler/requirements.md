@@ -31,10 +31,12 @@
 #### Acceptance Criteria - RDP协议
 
 1. WHEN 解析的协议类型为"rdp" THEN 系统 SHALL 自动启动Microsoft Remote Desktop应用程序
-2. WHEN Microsoft Remote Desktop启动 THEN 系统 SHALL 创建新的RDP连接配置
-3. WHEN 创建RDP连接配置 THEN 系统 SHALL 使用提取的地址和用户名
-4. WHEN RDP连接配置创建完成 THEN 系统 SHALL 自动发起远程桌面连接
-5. IF Microsoft Remote Desktop未安装 THEN 系统 SHALL 显示错误提示信息
+2. WHEN 接收到jms://协议请求 THEN 系统 SHALL 重新加载最新的RDP配置文件参数
+3. WHEN 重新加载RDP配置 THEN 系统 SHALL 使用用户在RDP设置界面中保存的最新配置（包括HiDPI、分辨率、质量设置等）
+4. WHEN Microsoft Remote Desktop启动 THEN 系统 SHALL 创建新的RDP连接配置
+5. WHEN 创建RDP连接配置 THEN 系统 SHALL 使用提取的地址和用户名，并应用最新的RDP参数设置
+6. WHEN RDP连接配置创建完成 THEN 系统 SHALL 自动发起远程桌面连接
+7. IF Microsoft Remote Desktop未安装 THEN 系统 SHALL 显示错误提示信息
 
 #### Acceptance Criteria - SSH协议
 

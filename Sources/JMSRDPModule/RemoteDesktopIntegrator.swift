@@ -20,28 +20,45 @@ public class RemoteDesktopIntegrator {
     ///   - qualityProfile: 质量配置文件（可选）
     /// - Throws: JMSError相关错误
     public func launchRDPConnection(_ connectionInfo: RDPConnectionInfo, quality: QualityProfile? = nil) throws {
+        print("🔍 RemoteDesktopIntegrator: 开始启动RDP连接")
+        print("🔍 服务器地址: \(connectionInfo.serverAddress)")
+        print("🔍 用户名: \(connectionInfo.username)")
+        
         // 1. 检查Microsoft Remote Desktop是否已安装
+        print("🔍 步骤1: 检查Microsoft Remote Desktop安装...")
         try verifyRemoteDesktopInstallation()
+        print("✅ Microsoft Remote Desktop 已安装")
         
         // 2. 生成优化的RDP配置
+        print("🔍 步骤2: 生成RDP配置...")
         let configContent = try configManager.generateOptimizedConfig(for: connectionInfo, quality: quality)
+        print("✅ RDP配置生成成功")
+        print("📄 配置内容预览:")
+        print(configContent.prefix(200) + (configContent.count > 200 ? "..." : ""))
         
         // 3. 创建临时RDP文件
+        print("🔍 步骤3: 创建临时RDP文件...")
         let rdpFile = try createTemporaryRDPFile(content: configContent, connectionInfo: connectionInfo)
+        print("✅ 临时RDP文件创建成功: \(rdpFile.path)")
         
         // 4. 启动Microsoft Remote Desktop
+        print("🔍 步骤4: 启动Microsoft Remote Desktop...")
         try launchRemoteDesktop(with: rdpFile)
+        print("✅ Microsoft Remote Desktop 启动成功")
         
         // 5. 发送成功通知
         NotificationManager.shared.showRDPConnectionSuccess(connectionInfo)
         
         // 6. 清理临时文件（延迟执行）
         scheduleFileCleanup(rdpFile)
+        print("🎉 RDP连接启动流程完成")
     }
     
     /// 验证Microsoft Remote Desktop是否已安装
     /// - Throws: JMSError.remoteDesktopNotFound
     public func verifyRemoteDesktopInstallation() throws {
+        print("🔍 检查Microsoft Remote Desktop安装状态...")
+        
         let possiblePaths = [
             "/Applications/Microsoft Remote Desktop.app",
             "/System/Applications/Microsoft Remote Desktop.app",
@@ -50,16 +67,21 @@ public class RemoteDesktopIntegrator {
         
         let fileManager = FileManager.default
         for path in possiblePaths {
+            print("🔍 检查路径: \(path)")
             if fileManager.fileExists(atPath: path) {
+                print("✅ 在路径找到Microsoft Remote Desktop: \(path)")
                 return // 找到了应用程序
             }
         }
         
         // 尝试通过Bundle ID查找
-        if let _ = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") {
+        print("🔍 通过Bundle ID查找: com.microsoft.rdc.macos")
+        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") {
+            print("✅ 通过Bundle ID找到Microsoft Remote Desktop: \(appURL.path)")
             return // 通过Bundle ID找到了
         }
         
+        print("❌ 未找到Microsoft Remote Desktop应用程序")
         throw JMSError.remoteDesktopNotFound
     }
     
@@ -112,25 +134,70 @@ public class RemoteDesktopIntegrator {
     }
     
     private func launchRemoteDesktop(with rdpFile: URL) throws {
+        print("🔍 获取Microsoft Remote Desktop路径...")
+        let remoteDesktopURL = try getRemoteDesktopPath()
+        print("✅ Microsoft Remote Desktop路径: \(remoteDesktopURL.path)")
+        
+        print("🔍 检查RDP文件是否存在: \(rdpFile.path)")
+        guard FileManager.default.fileExists(atPath: rdpFile.path) else {
+            print("❌ RDP文件不存在: \(rdpFile.path)")
+            throw JMSError.fileOperationFailed("RDP文件不存在")
+        }
+        print("✅ RDP文件存在")
+        
+        // 使用同步方式直接打开RDP文件
+        print("🔍 直接打开RDP文件...")
         do {
-            let remoteDesktopURL = try getRemoteDesktopPath()
-            
-            // 使用NSWorkspace启动应用程序并打开RDP文件
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = true
-            
-            NSWorkspace.shared.openApplication(at: remoteDesktopURL, configuration: configuration) { app, error in
-                if let error = error {
-                    print("启动Microsoft Remote Desktop失败: \(error.localizedDescription)")
-                } else {
-                    // 应用程序启动成功后，打开RDP文件
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        NSWorkspace.shared.open(rdpFile)
-                    }
+            let success = NSWorkspace.shared.open(rdpFile)
+            if success {
+                print("✅ RDP文件打开成功")
+            } else {
+                print("❌ RDP文件打开失败")
+                // 尝试备用方法：先启动应用程序，再打开文件
+                print("🔍 尝试备用方法：先启动应用程序...")
+                try launchRemoteDesktopAlternative(with: rdpFile, appURL: remoteDesktopURL)
+            }
+        } catch {
+            print("❌ 打开RDP文件时出错: \(error.localizedDescription)")
+            throw JMSError.configurationError("打开RDP文件失败: \(error.localizedDescription)")
+        }
+    }
+    
+    private func launchRemoteDesktopAlternative(with rdpFile: URL, appURL: URL) throws {
+        print("🔍 使用备用方法启动Microsoft Remote Desktop...")
+        
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        
+        var launchError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { app, error in
+            if let error = error {
+                print("❌ 启动Microsoft Remote Desktop失败: \(error.localizedDescription)")
+                launchError = error
+            } else {
+                print("✅ Microsoft Remote Desktop启动成功")
+                // 应用程序启动成功后，打开RDP文件
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    print("🔍 延迟打开RDP文件...")
+                    let openSuccess = NSWorkspace.shared.open(rdpFile)
+                    print(openSuccess ? "✅ RDP文件打开成功" : "❌ RDP文件打开失败")
+                    semaphore.signal()
                 }
             }
-            
-        } catch {
+            if launchError != nil {
+                semaphore.signal()
+            }
+        }
+        
+        // 等待最多10秒
+        let result = semaphore.wait(timeout: .now() + 10.0)
+        if result == .timedOut {
+            print("⚠️ 启动Microsoft Remote Desktop超时")
+        }
+        
+        if let error = launchError {
             throw JMSError.configurationError("启动Microsoft Remote Desktop失败: \(error.localizedDescription)")
         }
     }
@@ -163,7 +230,7 @@ public class RemoteDesktopIntegrator {
     /// 更新自定义RDP设置
     /// - Parameter settings: 新的RDP设置
     public func updateCustomSettings(_ settings: RDPSettings) {
-        let qualityProfile = RDPSettingsModel.convertToQualityProfile(settings)
+        let qualityProfile = RDPConfigManager.convertToQualityProfile(settings)
         configManager.setQualityProfile(qualityProfile)
     }
     

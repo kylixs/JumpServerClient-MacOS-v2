@@ -1,0 +1,22 @@
+JMS协议处理验证测试报告
+生成时间: 2025年 8月14日 星期四 21时56分56秒 CST
+项目路径: /Users/gongdewei/work/projects/jumpserver-client
+
+测试结果:
+1. 应用程序存在: ✅
+2. RDP协议处理: ❌
+3. SSH协议处理: ❌
+4. 配置重新加载: ❌
+5. 配置参数应用: ❌
+
+详细日志:
+- RDP测试日志: /Users/gongdewei/work/projects/jumpserver-client/jms_protocol_test.log
+- SSH测试日志: /Users/gongdewei/work/projects/jumpserver-client/jms_ssh_test.log
+
+关键验证点:
+- URL解析: 失败
+- Payload解码: 失败
+- 连接信息提取: 失败
+- RDP配置加载: 失败
+- 配置参数同步: 失败
+

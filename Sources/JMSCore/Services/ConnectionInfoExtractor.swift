@@ -37,16 +37,18 @@ public class ConnectionInfoExtractor {
             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
             if trimmedLine.isEmpty { continue }
             
-            // 处理不同的分隔符格式
+            // 处理RDP配置格式：key:type:value
             if let colonRange = trimmedLine.range(of: ":") {
                 let key = String(trimmedLine[..<colonRange.lowerBound])
                 let remainingPart = String(trimmedLine[colonRange.upperBound...])
                 
-                // 进一步解析值部分
+                // 进一步解析值部分 - 处理 key:type:value 格式
                 let value: String
                 if let secondColonRange = remainingPart.range(of: ":") {
+                    // 格式：key:type:value，取value部分
                     value = String(remainingPart[secondColonRange.upperBound...])
                 } else {
+                    // 格式：key:value，取value部分
                     value = remainingPart
                 }
                 
@@ -58,6 +60,9 @@ public class ConnectionInfoExtractor {
                 default:
                     additionalParams[key] = value
                 }
+                
+                // 添加调试日志
+                print("🔍 解析RDP参数: \(key) = \(value)")
             }
         }
         

@@ -270,6 +270,10 @@ public struct RDPSettingsModel {
             return settings
         }
     }
+}
+
+// MARK: - 配置转换扩展
+extension RDPConfigManager {
     
     /// 从RDPSettings转换为质量配置文件
     public static func convertToQualityProfile(_ settings: RDPSettings) -> QualityProfile {
@@ -283,5 +287,10 @@ public struct RDPSettingsModel {
         } else {
             return .custom(settings)
         }
+    }
+    
+    /// 从质量配置文件转换为RDPSettings
+    public static func convertFromQualityProfile(_ profile: QualityProfile) -> RDPSettings {
+        return RDPSettingsModel.convertFromQualityProfile(profile)
     }
 }

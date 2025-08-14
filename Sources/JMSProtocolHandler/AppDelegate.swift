@@ -95,14 +95,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMainMenu()
         
         // 注册URL事件处理
-        print("🔗 注册Apple Events URL处理器...")
+        logMessage("🔗 注册Apple Events URL处理器...")
         NSAppleEventManager.shared().setEventHandler(
             self,
             andSelector: #selector(handleURLEvent(_:withReplyEvent:)),
             forEventClass: AEEventClass(kInternetEventClass),
             andEventID: AEEventID(kAEGetURL)
         )
-        print("✅ Apple Events URL处理器注册完成")
+        logMessage("✅ Apple Events URL处理器注册完成")
         
         // 检查是否有命令行参数传入的URL
         print("🔍 开始检查命令行参数...")
@@ -487,17 +487,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - URL事件处理
     
     @objc func handleURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
-        print("🎯 handleURLEvent() 被调用")
-        print("📅 事件时间: \(Date())")
-        print("📋 事件描述: \(event)")
+        logMessage("🎯 handleURLEvent() 被调用")
+        logMessage("📅 事件时间: \(Date())")
+        logMessage("📋 事件描述: \(event)")
         
         guard let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue else {
-            print("❌ 无法从Apple Event中获取URL参数")
+            logMessage("❌ 无法从Apple Event中获取URL参数")
             errorHandler.handleJMSError(.invalidURL("无法获取URL参数"))
             return
         }
         
-        print("✅ 从Apple Event接收到URL: \(urlString)")
+        logMessage("✅ 从Apple Event接收到URL: \(urlString)")
         processJMSURL(urlString)
     }
     
@@ -534,63 +534,73 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - JMS URL处理
     
     private func processJMSURL(_ urlString: String) {
-        print("🔄 processJMSURL() 开始处理: \(urlString)")
-        print("📅 处理时间: \(Date())")
+        logMessage("🔄 processJMSURL() 开始处理: \(urlString)")
+        logMessage("📅 处理时间: \(Date())")
         
         do {
             // 1. 解析URL
-            print("🔍 步骤1: 解析URL...")
+            logMessage("🔍 步骤1: 解析URL...")
             let urlComponents = try urlParser.parseURL(urlString)
-            print("✅ URL解析成功: \(urlComponents.scheme)://...")
+            logMessage("✅ URL解析成功: \(urlComponents.scheme)://...")
             
             // 2. 解码payload
-            print("🔍 步骤2: 解码payload...")
+            logMessage("🔍 步骤2: 解码payload...")
             let config = try payloadDecoder.decodePayload(urlComponents.encodedPayload)
-            print("✅ Payload解码成功，协议类型: \(config.protocolType)")
+            logMessage("✅ Payload解码成功，协议类型: \(config.protocolType)")
             
             // 3. 提取连接信息
-            print("🔍 步骤3: 提取连接信息...")
+            logMessage("🔍 步骤3: 提取连接信息...")
             let connectionInfo = try connectionInfoExtractor.extractConnectionInfo(from: config)
-            print("✅ 连接信息提取成功")
+            logMessage("✅ 连接信息提取成功")
             
             // 4. 根据协议类型启动相应的连接
-            print("🔍 步骤4: 启动连接...")
+            logMessage("🔍 步骤4: 启动连接...")
             switch connectionInfo {
             case .rdp(let rdpInfo):
-                print("🖥️ 启动RDP连接...")
+                logMessage("🖥️ 启动RDP连接...")
                 try handleRDPConnection(rdpInfo)
             case .ssh(let sshInfo):
-                print("💻 启动SSH连接...")
+                logMessage("💻 启动SSH连接...")
                 try handleSSHConnection(sshInfo)
             }
             
-            print("🎉 JMS URL处理完成")
+            logMessage("🎉 JMS URL处理完成")
             
         } catch {
-            print("❌ JMS URL处理失败: \(error)")
+            logMessage("❌ JMS URL处理失败: \(error)")
             // 按需求文档要求：直接处理错误，不显示弹框提示
             errorHandler.handleError(error, context: "处理JMS URL: \(urlString)", showAlert: false)
         }
     }
     
     private func handleRDPConnection(_ connectionInfo: RDPConnectionInfo) throws {
-        print("启动RDP连接到: \(connectionInfo.serverAddress)")
+        logMessage("启动RDP连接到: \(connectionInfo.serverAddress)")
+        logMessage("RDP用户名: \(connectionInfo.username)")
         
-        // 使用当前质量配置启动RDP连接
-        try rdpIntegrator.launchRDPConnection(connectionInfo)
-        
-        print("RDP连接启动成功")
+        do {
+            // 使用当前质量配置启动RDP连接
+            try rdpIntegrator.launchRDPConnection(connectionInfo)
+            logMessage("✅ RDP连接启动成功")
+        } catch {
+            logMessage("❌ RDP连接启动失败: \(error.localizedDescription)")
+            throw error
+        }
         
         // 按需求文档要求：直接处理，不显示弹框提示
     }
     
     private func handleSSHConnection(_ connectionInfo: SSHConnectionInfo) throws {
-        print("启动SSH连接到: \(connectionInfo.ip):\(connectionInfo.port)")
+        logMessage("启动SSH连接到: \(connectionInfo.ip):\(connectionInfo.port)")
+        logMessage("SSH用户名: \(connectionInfo.username)")
         
-        // 启动SSH连接
-        try sshIntegrator.launchSSHConnection(connectionInfo)
-        
-        print("SSH连接启动成功")
+        do {
+            // 启动SSH连接
+            try sshIntegrator.launchSSHConnection(connectionInfo)
+            logMessage("✅ SSH连接启动成功")
+        } catch {
+            logMessage("❌ SSH连接启动失败: \(error.localizedDescription)")
+            throw error
+        }
         
         // 按需求文档要求：直接处理，不显示弹框提示
     }
