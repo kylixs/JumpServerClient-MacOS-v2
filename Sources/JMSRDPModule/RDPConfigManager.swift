@@ -52,8 +52,24 @@ public class RDPConfigManager {
         logInfo("   HiDPI启用: \(savedSettings.hiDPI.enabled)")
         logInfo("   分辨率: \(savedSettings.resolution.width)×\(savedSettings.resolution.height)")
         
-        // 2. 检测显示器配置 - 获取逻辑分辨率作为基础配置
-        let displayConfig = try displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
+        // 2. 根据useAutoDetection设置决定是否检测显示器配置
+        let displayConfig: DisplayConfiguration
+        if savedSettings.useAutoDetection {
+            // 启用自动检测：检测显示器配置
+            displayConfig = try displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
+            logInfo("🔍 自动检测已启用，检测到显示器配置: \(displayConfig.width)×\(displayConfig.height)")
+        } else {
+            // 禁用自动检测：使用用户配置的分辨率创建虚拟显示器配置
+            displayConfig = DisplayConfiguration(
+                width: savedSettings.resolution.width,
+                height: savedSettings.resolution.height,
+                scaleFactor: savedSettings.hiDPI.enabled ? savedSettings.hiDPI.scaleFactor : 1.0,
+                colorDepth: savedSettings.colorDepth,
+                isHiDPI: savedSettings.hiDPI.enabled,
+                refreshRate: 60.0  // 默认刷新率
+            )
+            logInfo("🔧 自动检测已禁用，使用用户配置: \(displayConfig.width)×\(displayConfig.height)")
+        }
         
         // 3. 生成配置文件
         let configContent = generateRDPConfigFile(connectionInfo: connectionInfo, settings: savedSettings, displayConfig: displayConfig)
@@ -191,10 +207,10 @@ public class RDPConfigManager {
                 logInfo("🔧 自动检测+无HiDPI: 使用逻辑分辨率 \(finalWidth)×\(finalHeight)")
             }
         } else {
-            // 未启用自动检测：使用用户配置的分辨率和参数
-            finalWidth = settings.resolution.width
-            finalHeight = settings.resolution.height
-            finalScaleFactor = settings.hiDPI.enabled ? settings.hiDPI.scaleFactor : 1.0
+            // 未启用自动检测：使用传入的displayConfig（已经基于用户配置创建）
+            finalWidth = displayConfig.width
+            finalHeight = displayConfig.height
+            finalScaleFactor = displayConfig.scaleFactor
             logInfo("🔧 手动配置: 使用用户设置 \(finalWidth)×\(finalHeight), HiDPI: \(settings.hiDPI.enabled), 缩放: \(finalScaleFactor)")
         }
         
