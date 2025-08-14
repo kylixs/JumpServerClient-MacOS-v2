@@ -109,6 +109,13 @@ public struct RDPSettings: Codable {
     public var hiDPI: HiDPISettings
     public var useAutoDetection: Bool
     
+    // 新增：显示和连接设置
+    public var enableSmartSizing: Bool      // 智能缩放
+    public var screenModeId: Int           // 屏幕模式ID (1=窗口, 2=全屏)
+    public var enableAutoResize: Bool      // 自动调整分辨率
+    public var enableDesktopComposition: Bool  // 桌面合成
+    public var enableRemoteFX: Bool        // RemoteFX支持
+    
     public init(
         profileName: String,
         compressionLevel: Int,
@@ -120,7 +127,12 @@ public struct RDPSettings: Codable {
         enableThemes: Bool,
         resolution: ResolutionSettings = ResolutionSettings.fullHD,
         hiDPI: HiDPISettings = HiDPISettings(),
-        useAutoDetection: Bool = true
+        useAutoDetection: Bool = true,
+        enableSmartSizing: Bool = false,
+        screenModeId: Int = 2,
+        enableAutoResize: Bool = false,
+        enableDesktopComposition: Bool = true,
+        enableRemoteFX: Bool = false
     ) {
         self.profileName = profileName
         self.compressionLevel = compressionLevel
@@ -133,6 +145,11 @@ public struct RDPSettings: Codable {
         self.resolution = resolution
         self.hiDPI = hiDPI
         self.useAutoDetection = useAutoDetection
+        self.enableSmartSizing = enableSmartSizing
+        self.screenModeId = screenModeId
+        self.enableAutoResize = enableAutoResize
+        self.enableDesktopComposition = enableDesktopComposition
+        self.enableRemoteFX = enableRemoteFX
     }
     
     // MARK: - 预设配置
@@ -147,7 +164,12 @@ public struct RDPSettings: Codable {
         enableThemes: false,
         resolution: ResolutionSettings.fullHD,
         hiDPI: HiDPISettings(enabled: false, scaleFactor: 1.0),
-        useAutoDetection: false
+        useAutoDetection: false,
+        enableSmartSizing: false,      // 禁用智能缩放以提升性能
+        screenModeId: 2,              // 全屏模式
+        enableAutoResize: false,      // 禁用自动调整分辨率
+        enableDesktopComposition: false, // 禁用桌面合成以提升性能
+        enableRemoteFX: false         // 禁用RemoteFX以提升性能
     )
     
     public static let balanced = RDPSettings(
@@ -161,7 +183,12 @@ public struct RDPSettings: Codable {
         enableThemes: true,
         resolution: ResolutionSettings.fullHD,
         hiDPI: HiDPISettings(enabled: true, scaleFactor: 1.5),
-        useAutoDetection: true
+        useAutoDetection: true,
+        enableSmartSizing: false,      // 禁用智能缩放保持清晰度
+        screenModeId: 2,              // 全屏模式
+        enableAutoResize: true,       // 启用自动调整分辨率
+        enableDesktopComposition: true, // 启用桌面合成
+        enableRemoteFX: false         // 平衡模式不启用RemoteFX
     )
     
     public static let quality = RDPSettings(
@@ -175,7 +202,12 @@ public struct RDPSettings: Codable {
         enableThemes: true,
         resolution: ResolutionSettings.twoK,
         hiDPI: HiDPISettings(enabled: true, scaleFactor: 2.0),
-        useAutoDetection: true
+        useAutoDetection: true,
+        enableSmartSizing: false,      // 禁用智能缩放保持最佳质量
+        screenModeId: 2,              // 全屏模式
+        enableAutoResize: true,       // 启用自动调整分辨率
+        enableDesktopComposition: true, // 启用桌面合成
+        enableRemoteFX: true          // 质量优先启用RemoteFX
     )
     
     // MARK: - 静态方法
@@ -200,14 +232,15 @@ public struct RDPSettings: Codable {
         audiomode:i:\(getAudioMode())
         compression:i:\(compressionLevel)
         session bpp:i:\(colorDepth)
-        smart sizing:i:0
-        screen mode id:i:2
+        smart sizing:i:\(enableSmartSizing ? 1 : 0)
+        screen mode id:i:\(screenModeId)
         desktopwidth:i:\(resolution.width)
         desktopheight:i:\(resolution.height)
         font smoothing:i:\(enableFontSmoothing ? 1 : 0)
         disable wallpaper:i:\(enableWallpaper ? 0 : 1)
         disable menu anims:i:\(enableMenuAnimations ? 0 : 1)
         disable themes:i:\(enableThemes ? 0 : 1)
+        allow desktop composition:i:\(enableDesktopComposition ? 1 : 0)
         """
         
         // 添加HiDPI相关设置

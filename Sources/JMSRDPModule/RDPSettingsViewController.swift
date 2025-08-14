@@ -48,6 +48,13 @@ public class RDPSettingsViewController: NSViewController {
     // 新增：多显示器支持组件
     private var displaySelectionPopup: NSPopUpButton!
     private var refreshDisplaysButton: NSButton!
+    
+    // 新增：显示和连接设置组件
+    private var smartSizingCheckbox: NSButton!
+    private var screenModePopup: NSPopUpButton!
+    private var autoResizeCheckbox: NSButton!
+    private var desktopCompositionCheckbox: NSButton!
+    private var remoteFXCheckbox: NSButton!
     private var displayInfoPanel: NSView!
     private var displayNameLabel: NSTextField!
     private var displaySpecsLabel: NSTextField!
@@ -118,6 +125,7 @@ public class RDPSettingsViewController: NSViewController {
         setupCompressionControls()
         setupQualityControls()
         setupEffectControls()
+        setupAdvancedDisplayControls()  // 新增：高级显示设置
         setupActionButtons()
         setupStatusLabel()
     }
@@ -403,6 +411,51 @@ public class RDPSettingsViewController: NSViewController {
         themesCheckbox.frame = NSRect(x: 350, y: 150, width: 100, height: 20)
         themesCheckbox.state = .on
         view.addSubview(themesCheckbox)
+    }
+    
+    private func setupAdvancedDisplayControls() {
+        // 高级显示设置区域标题
+        let advancedSectionLabel = NSTextField(labelWithString: "高级显示设置")
+        advancedSectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
+        advancedSectionLabel.frame = NSRect(x: 20, y: 120, width: 150, height: 20)
+        view.addSubview(advancedSectionLabel)
+        
+        // 智能缩放选项
+        smartSizingCheckbox = NSButton(checkboxWithTitle: "智能缩放", target: self, action: #selector(advancedControlChanged(_:)))
+        smartSizingCheckbox.frame = NSRect(x: 20, y: 95, width: 100, height: 20)
+        smartSizingCheckbox.state = .off
+        view.addSubview(smartSizingCheckbox)
+        
+        // 屏幕模式选择
+        let screenModeLabel = NSTextField(labelWithString: "屏幕模式:")
+        screenModeLabel.frame = NSRect(x: 130, y: 95, width: 80, height: 20)
+        view.addSubview(screenModeLabel)
+        
+        screenModePopup = NSPopUpButton()
+        screenModePopup.addItems(withTitles: ["窗口模式", "全屏模式"])
+        screenModePopup.selectItem(at: 1) // 默认全屏模式
+        screenModePopup.target = self
+        screenModePopup.action = #selector(advancedControlChanged(_:))
+        screenModePopup.frame = NSRect(x: 210, y: 95, width: 100, height: 25)
+        view.addSubview(screenModePopup)
+        
+        // 自动调整分辨率
+        autoResizeCheckbox = NSButton(checkboxWithTitle: "自动调整分辨率", target: self, action: #selector(advancedControlChanged(_:)))
+        autoResizeCheckbox.frame = NSRect(x: 320, y: 95, width: 130, height: 20)
+        autoResizeCheckbox.state = .off
+        view.addSubview(autoResizeCheckbox)
+        
+        // 桌面合成
+        desktopCompositionCheckbox = NSButton(checkboxWithTitle: "桌面合成", target: self, action: #selector(advancedControlChanged(_:)))
+        desktopCompositionCheckbox.frame = NSRect(x: 20, y: 70, width: 100, height: 20)
+        desktopCompositionCheckbox.state = .on
+        view.addSubview(desktopCompositionCheckbox)
+        
+        // RemoteFX支持
+        remoteFXCheckbox = NSButton(checkboxWithTitle: "RemoteFX", target: self, action: #selector(advancedControlChanged(_:)))
+        remoteFXCheckbox.frame = NSRect(x: 130, y: 70, width: 100, height: 20)
+        remoteFXCheckbox.state = .off
+        view.addSubview(remoteFXCheckbox)
     }
     
     private func setupActionButtons() {
@@ -1077,7 +1130,12 @@ public class RDPSettingsViewController: NSViewController {
             enableThemes: themesCheckbox.state == .on,
             resolution: resolution,
             hiDPI: hiDPI,
-            useAutoDetection: autoDetectionCheckbox.state == .on
+            useAutoDetection: autoDetectionCheckbox.state == .on,
+            enableSmartSizing: smartSizingCheckbox.state == .on,
+            screenModeId: screenModePopup.indexOfSelectedItem + 1, // 1=窗口, 2=全屏
+            enableAutoResize: autoResizeCheckbox.state == .on,
+            enableDesktopComposition: desktopCompositionCheckbox.state == .on,
+            enableRemoteFX: remoteFXCheckbox.state == .on
         )
     }
     
@@ -1146,6 +1204,13 @@ public class RDPSettingsViewController: NSViewController {
         animationsCheckbox.state = settings.enableMenuAnimations ? .on : .off
         themesCheckbox.state = settings.enableThemes ? .on : .off
         
+        // 更新高级显示设置
+        smartSizingCheckbox.state = settings.enableSmartSizing ? .on : .off
+        screenModePopup.selectItem(at: settings.screenModeId - 1) // 1=窗口, 2=全屏
+        autoResizeCheckbox.state = settings.enableAutoResize ? .on : .off
+        desktopCompositionCheckbox.state = settings.enableDesktopComposition ? .on : .off
+        remoteFXCheckbox.state = settings.enableRemoteFX ? .on : .off
+        
         // 更新带宽显示
         updateBandwidthDisplay()
     }
@@ -1196,6 +1261,11 @@ public class RDPSettingsViewController: NSViewController {
     @objc private func effectControlChanged(_ sender: NSButton) {
         settingsChanged()
         updateStatusLabel("特效设置已更改")
+    }
+    
+    @objc private func advancedControlChanged(_ sender: NSControl) {
+        settingsChanged()
+        updateStatusLabel("高级显示设置已更改")
     }
     
     @objc private func saveSettings(_ sender: NSButton) {

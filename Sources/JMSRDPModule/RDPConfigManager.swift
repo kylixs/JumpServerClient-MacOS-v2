@@ -231,9 +231,16 @@ public class RDPConfigManager {
         let audioMode = getAudioMode(from: settings.audioQuality)
         configLines.append("audiomode:i:\(audioMode)")
         
-        // 其他设置
-        configLines.append("smart sizing:i:0")  // 禁用智能缩放
-        configLines.append("screen mode id:i:2")
+        // 其他设置 - 使用RDPSettings中的参数
+        configLines.append("smart sizing:i:\(settings.enableSmartSizing ? 1 : 0)")
+        configLines.append("screen mode id:i:\(settings.screenModeId)")
+        configLines.append("allow desktop composition:i:\(settings.enableDesktopComposition ? 1 : 0)")
+        
+        // RemoteFX设置
+        if settings.enableRemoteFX {
+            configLines.append("use redirection server name:i:1")
+            configLines.append("redirected video capture encoding quality:i:1")
+        }
         
         // HiDPI设置 - 根据最终决定的缩放因子设置
         if (settings.useAutoDetection && settings.hiDPI.enabled) || (!settings.useAutoDetection && settings.hiDPI.enabled) {
