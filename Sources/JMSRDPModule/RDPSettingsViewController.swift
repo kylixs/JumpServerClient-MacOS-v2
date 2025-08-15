@@ -86,7 +86,7 @@ public class RDPSettingsViewController: NSViewController {
     // MARK: - 生命周期
     public override func loadView() {
         print("📱 加载RDP设置界面...")
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 580, height: 650)) // 简化高度
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 580, height: 700)) // 增加高度到700px
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
@@ -120,23 +120,23 @@ public class RDPSettingsViewController: NSViewController {
     
     // MARK: - UI设置
     private func setupUI() {
-        setupTitleAndProfile()           // Y: 600-620 标题和质量配置
-        setupResolutionModeSelection()   // Y: 520-590 分辨率设置（核心功能）
-        setupDisplaySettings()           // Y: 480-510 显示设置
-        setupOtherOptions()             // Y: 440-470 其他选项
-        setupActionButtons()            // Y: 400-430 操作按钮和状态
+        setupTitleAndProfile()           // Y: 660-680 标题和质量配置
+        setupResolutionModeSelection()   // Y: 580-640 分辨率设置（核心功能）
+        setupDisplaySettings()           // Y: 520-560 显示设置
+        setupOtherOptions()             // Y: 460-500 其他选项
+        setupActionButtons()            // Y: 400-440 操作按钮和状态
     }
     
     private func setupTitleAndProfile() {
         // 标题
         let titleLabel = NSTextField(labelWithString: "RDP连接设置")
         titleLabel.font = NSFont.boldSystemFont(ofSize: 16)
-        titleLabel.frame = NSRect(x: 20, y: 600, width: 200, height: 20)
+        titleLabel.frame = NSRect(x: 20, y: 665, width: 200, height: 20)
         view.addSubview(titleLabel)
         
         // 配置文件选择
         let profileLabel = NSTextField(labelWithString: "质量预设:")
-        profileLabel.frame = NSRect(x: 300, y: 600, width: 80, height: 20)
+        profileLabel.frame = NSRect(x: 300, y: 665, width: 80, height: 20)
         view.addSubview(profileLabel)
         
         profileSegmentedControl = NSSegmentedControl()
@@ -147,26 +147,34 @@ public class RDPSettingsViewController: NSViewController {
         profileSegmentedControl.selectedSegment = 1
         profileSegmentedControl.target = self
         profileSegmentedControl.action = #selector(profileChanged(_:))
-        profileSegmentedControl.frame = NSRect(x: 380, y: 600, width: 180, height: 25)
+        profileSegmentedControl.frame = NSRect(x: 380, y: 660, width: 180, height: 25)
         view.addSubview(profileSegmentedControl)
     }
     
     private func setupResolutionModeSelection() {
+        // 分辨率设置区域背景面板
+        let resolutionSectionPanel = NSView()
+        resolutionSectionPanel.frame = NSRect(x: 10, y: 580, width: 560, height: 60)
+        resolutionSectionPanel.wantsLayer = true
+        resolutionSectionPanel.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        resolutionSectionPanel.layer?.cornerRadius = 8
+        view.addSubview(resolutionSectionPanel)
+        
         // 分辨率设置区域标题
         let resolutionSectionLabel = NSTextField(labelWithString: "📐 分辨率设置")
         resolutionSectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        resolutionSectionLabel.frame = NSRect(x: 20, y: 570, width: 150, height: 20)
+        resolutionSectionLabel.frame = NSRect(x: 20, y: 635, width: 150, height: 20)
         view.addSubview(resolutionSectionLabel)
         
         // 分辨率模式选择（二选一）
         autoDetectRadio = NSButton(radioButtonWithTitle: "自动检测", target: self, action: #selector(resolutionModeChanged(_:)))
-        autoDetectRadio.frame = NSRect(x: 20, y: 545, width: 100, height: 20)
+        autoDetectRadio.frame = NSRect(x: 20, y: 610, width: 100, height: 20)
         autoDetectRadio.state = .on // 默认选择自动检测
         autoDetectRadio.tag = 1000
         view.addSubview(autoDetectRadio)
         
         manualSetRadio = NSButton(radioButtonWithTitle: "手动设置", target: self, action: #selector(resolutionModeChanged(_:)))
-        manualSetRadio.frame = NSRect(x: 130, y: 545, width: 100, height: 20)
+        manualSetRadio.frame = NSRect(x: 130, y: 610, width: 100, height: 20)
         manualSetRadio.state = .off
         manualSetRadio.tag = 1001
         view.addSubview(manualSetRadio)
@@ -181,7 +189,7 @@ public class RDPSettingsViewController: NSViewController {
     private func setupAutoDetectArea() {
         // 自动检测区域背景
         let autoDetectPanel = NSView()
-        autoDetectPanel.frame = NSRect(x: 30, y: 520, width: 520, height: 20)
+        autoDetectPanel.frame = NSRect(x: 30, y: 585, width: 520, height: 20)
         autoDetectPanel.identifier = NSUserInterfaceItemIdentifier("autoDetectPanel")
         view.addSubview(autoDetectPanel)
         
@@ -208,7 +216,7 @@ public class RDPSettingsViewController: NSViewController {
     private func setupManualSetArea() {
         // 手动设置区域背景
         let manualSetPanel = NSView()
-        manualSetPanel.frame = NSRect(x: 30, y: 495, width: 520, height: 45)
+        manualSetPanel.frame = NSRect(x: 30, y: 580, width: 520, height: 45)
         manualSetPanel.identifier = NSUserInterfaceItemIdentifier("manualSetPanel")
         manualSetPanel.isHidden = true // 默认隐藏
         view.addSubview(manualSetPanel)
@@ -275,32 +283,40 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func setupDisplaySettings() {
+        // 显示设置区域背景面板
+        let displaySettingsPanel = NSView()
+        displaySettingsPanel.frame = NSRect(x: 10, y: 520, width: 560, height: 40)
+        displaySettingsPanel.wantsLayer = true
+        displaySettingsPanel.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        displaySettingsPanel.layer?.cornerRadius = 8
+        view.addSubview(displaySettingsPanel)
+        
         // 显示设置区域标题
         let displaySettingsLabel = NSTextField(labelWithString: "🎨 显示设置")
         displaySettingsLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        displaySettingsLabel.frame = NSRect(x: 20, y: 480, width: 100, height: 20)
+        displaySettingsLabel.frame = NSRect(x: 20, y: 555, width: 100, height: 20)
         view.addSubview(displaySettingsLabel)
         
         // HiDPI优化
         hiDPICheckbox = NSButton(checkboxWithTitle: "HiDPI优化", target: self, action: #selector(hiDPISettingChanged(_:)))
-        hiDPICheckbox.frame = NSRect(x: 20, y: 455, width: 100, height: 20)
+        hiDPICheckbox.frame = NSRect(x: 20, y: 530, width: 100, height: 20)
         hiDPICheckbox.state = .on
         view.addSubview(hiDPICheckbox)
         
         // 缩放设置
         let scaleLabel = NSTextField(labelWithString: "缩放:")
-        scaleLabel.frame = NSRect(x: 130, y: 455, width: 40, height: 20)
+        scaleLabel.frame = NSRect(x: 130, y: 530, width: 40, height: 20)
         view.addSubview(scaleLabel)
         
         let scalePopup = NSPopUpButton()
         scalePopup.addItems(withTitles: ["100%", "125%", "150%", "200%"])
         scalePopup.selectItem(at: 2) // 默认150%
-        scalePopup.frame = NSRect(x: 175, y: 455, width: 70, height: 25)
+        scalePopup.frame = NSRect(x: 175, y: 530, width: 70, height: 25)
         view.addSubview(scalePopup)
         
         // 颜色深度
         let colorLabel = NSTextField(labelWithString: "颜色:")
-        colorLabel.frame = NSRect(x: 255, y: 455, width: 40, height: 20)
+        colorLabel.frame = NSRect(x: 255, y: 530, width: 40, height: 20)
         view.addSubview(colorLabel)
         
         colorDepthPopup = NSPopUpButton()
@@ -308,12 +324,12 @@ public class RDPSettingsViewController: NSViewController {
         colorDepthPopup.selectItem(at: 1) // 默认24位
         colorDepthPopup.target = self
         colorDepthPopup.action = #selector(qualityControlChanged(_:))
-        colorDepthPopup.frame = NSRect(x: 300, y: 455, width: 70, height: 25)
+        colorDepthPopup.frame = NSRect(x: 300, y: 530, width: 70, height: 25)
         view.addSubview(colorDepthPopup)
         
         // 音频质量
         let audioLabel = NSTextField(labelWithString: "音频:")
-        audioLabel.frame = NSRect(x: 380, y: 455, width: 40, height: 20)
+        audioLabel.frame = NSRect(x: 380, y: 530, width: 40, height: 20)
         view.addSubview(audioLabel)
         
         audioQualityPopup = NSPopUpButton()
@@ -321,38 +337,46 @@ public class RDPSettingsViewController: NSViewController {
         audioQualityPopup.selectItem(at: 2) // 默认中等
         audioQualityPopup.target = self
         audioQualityPopup.action = #selector(qualityControlChanged(_:))
-        audioQualityPopup.frame = NSRect(x: 425, y: 455, width: 80, height: 25)
+        audioQualityPopup.frame = NSRect(x: 425, y: 530, width: 80, height: 25)
         view.addSubview(audioQualityPopup)
     }
     
     private func setupOtherOptions() {
+        // 其他选项区域背景面板
+        let otherOptionsPanel = NSView()
+        otherOptionsPanel.frame = NSRect(x: 10, y: 460, width: 560, height: 40)
+        otherOptionsPanel.wantsLayer = true
+        otherOptionsPanel.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        otherOptionsPanel.layer?.cornerRadius = 8
+        view.addSubview(otherOptionsPanel)
+        
         // 其他选项区域标题
         let otherOptionsLabel = NSTextField(labelWithString: "⚙️ 其他选项")
         otherOptionsLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        otherOptionsLabel.frame = NSRect(x: 20, y: 440, width: 100, height: 20)
+        otherOptionsLabel.frame = NSRect(x: 20, y: 495, width: 100, height: 20)
         view.addSubview(otherOptionsLabel)
         
         // 字体平滑
         fontSmoothingCheckbox = NSButton(checkboxWithTitle: "字体平滑", target: self, action: #selector(effectControlChanged(_:)))
-        fontSmoothingCheckbox.frame = NSRect(x: 20, y: 415, width: 80, height: 20)
+        fontSmoothingCheckbox.frame = NSRect(x: 20, y: 470, width: 80, height: 20)
         fontSmoothingCheckbox.state = .on
         view.addSubview(fontSmoothingCheckbox)
         
         // 桌面壁纸
         wallpaperCheckbox = NSButton(checkboxWithTitle: "桌面壁纸", target: self, action: #selector(effectControlChanged(_:)))
-        wallpaperCheckbox.frame = NSRect(x: 110, y: 415, width: 80, height: 20)
+        wallpaperCheckbox.frame = NSRect(x: 110, y: 470, width: 80, height: 20)
         wallpaperCheckbox.state = .on
         view.addSubview(wallpaperCheckbox)
         
         // 智能缩放
         smartSizingCheckbox = NSButton(checkboxWithTitle: "智能缩放", target: self, action: #selector(advancedControlChanged(_:)))
-        smartSizingCheckbox.frame = NSRect(x: 200, y: 415, width: 80, height: 20)
+        smartSizingCheckbox.frame = NSRect(x: 200, y: 470, width: 80, height: 20)
         smartSizingCheckbox.state = .off
         view.addSubview(smartSizingCheckbox)
         
         // 屏幕模式
         let screenModeLabel = NSTextField(labelWithString: "屏幕模式:")
-        screenModeLabel.frame = NSRect(x: 290, y: 415, width: 70, height: 20)
+        screenModeLabel.frame = NSRect(x: 290, y: 470, width: 70, height: 20)
         view.addSubview(screenModeLabel)
         
         screenModePopup = NSPopUpButton()
@@ -360,42 +384,43 @@ public class RDPSettingsViewController: NSViewController {
         screenModePopup.selectItem(at: 1) // 默认全屏
         screenModePopup.target = self
         screenModePopup.action = #selector(advancedControlChanged(_:))
-        screenModePopup.frame = NSRect(x: 365, y: 415, width: 70, height: 25)
+        screenModePopup.frame = NSRect(x: 365, y: 470, width: 70, height: 25)
         view.addSubview(screenModePopup)
     }
     
     private func setupActionButtons() {
+        // 操作区域背景面板
+        let actionPanel = NSView()
+        actionPanel.frame = NSRect(x: 10, y: 400, width: 560, height: 40)
+        actionPanel.wantsLayer = true
+        actionPanel.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        actionPanel.layer?.cornerRadius = 8
+        view.addSubview(actionPanel)
+        
         // 操作按钮
         let saveButton = NSButton(title: "保存", target: self, action: #selector(saveSettings(_:)))
         saveButton.bezelStyle = .rounded
-        saveButton.frame = NSRect(x: 20, y: 380, width: 60, height: 30)
+        saveButton.frame = NSRect(x: 20, y: 415, width: 60, height: 30)
         view.addSubview(saveButton)
         
         let resetButton = NSButton(title: "重置", target: self, action: #selector(resetSettings(_:)))
         resetButton.bezelStyle = .rounded
-        resetButton.frame = NSRect(x: 90, y: 380, width: 60, height: 30)
+        resetButton.frame = NSRect(x: 90, y: 415, width: 60, height: 30)
         view.addSubview(resetButton)
         
         let exportButton = NSButton(title: "导出", target: self, action: #selector(exportSettings(_:)))
         exportButton.bezelStyle = .rounded
-        exportButton.frame = NSRect(x: 160, y: 380, width: 60, height: 30)
+        exportButton.frame = NSRect(x: 160, y: 415, width: 60, height: 30)
         view.addSubview(exportButton)
         
         let importButton = NSButton(title: "导入", target: self, action: #selector(importSettings(_:)))
         importButton.bezelStyle = .rounded
-        importButton.frame = NSRect(x: 230, y: 380, width: 60, height: 30)
+        importButton.frame = NSRect(x: 230, y: 415, width: 60, height: 30)
         view.addSubview(importButton)
         
         // 状态标签
         statusLabel = NSTextField(labelWithString: "状态: 就绪")
-        statusLabel.frame = NSRect(x: 350, y: 385, width: 200, height: 20)
-        statusLabel.textColor = NSColor.secondaryLabelColor
-        view.addSubview(statusLabel)
-    }
-    
-    private func setupStatusLabel() {
-        statusLabel = NSTextField(labelWithString: "状态: 就绪")
-        statusLabel.frame = NSRect(x: 20, y: 60, width: 540, height: 20)
+        statusLabel.frame = NSRect(x: 350, y: 420, width: 200, height: 20)
         statusLabel.textColor = NSColor.secondaryLabelColor
         view.addSubview(statusLabel)
     }
