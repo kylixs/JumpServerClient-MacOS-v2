@@ -166,20 +166,23 @@ public class RDPSettingsViewController: NSViewController {
         resolutionPopup.frame = NSRect(x: 130, y: 395, width: 180, height: 25)  // 从420调整到395
         view.addSubview(resolutionPopup)
         
+        // 自定义分辨率输入框 - 移动到预设分辨率选项右侧，默认隐藏
         customWidthField = NSTextField()
         customWidthField.placeholderString = "宽度"
         customWidthField.target = self
         customWidthField.action = #selector(customResolutionChanged(_:))
-        customWidthField.frame = NSRect(x: 80, y: 370, width: 80, height: 25)  // 从390调整到370
+        customWidthField.frame = NSRect(x: 320, y: 395, width: 80, height: 25)  // 移动到右侧
         customWidthField.isEnabled = false
+        customWidthField.isHidden = true  // 默认隐藏
         view.addSubview(customWidthField)
         
         customHeightField = NSTextField()
         customHeightField.placeholderString = "高度"
         customHeightField.target = self
         customHeightField.action = #selector(customResolutionChanged(_:))
-        customHeightField.frame = NSRect(x: 190, y: 370, width: 80, height: 25)  // 从390调整到370
+        customHeightField.frame = NSRect(x: 410, y: 395, width: 80, height: 25)  // 移动到右侧
         customHeightField.isEnabled = false
+        customHeightField.isHidden = true  // 默认隐藏
         view.addSubview(customHeightField)
     }
     
@@ -436,6 +439,10 @@ public class RDPSettingsViewController: NSViewController {
         // 如果是自定义分辨率，切换到自定义模式
         resolutionPopup.selectItem(at: 3) // "自定义分辨率"
         
+        // 显示自定义分辨率输入框（因为选择了自定义分辨率）
+        customWidthField.isHidden = false
+        customHeightField.isHidden = false
+        
         // 根据自动检测状态决定是否启用输入框
         let isAutoDetectionEnabled = autoDetectionCheckbox.state == .on
         if isAutoDetectionEnabled {
@@ -496,6 +503,11 @@ public class RDPSettingsViewController: NSViewController {
     @objc private func resolutionChanged(_ sender: NSPopUpButton) {
         let isAutoDetectionEnabled = autoDetectionCheckbox.state == .on
         let isCustom = sender.indexOfSelectedItem == 3
+        
+        // 控制自定义分辨率输入框的显示/隐藏
+        // 只有选中"自定义分辨率"时才显示
+        customWidthField.isHidden = !isCustom
+        customHeightField.isHidden = !isCustom
         
         if isAutoDetectionEnabled {
             // 自动检测模式：自定义分辨率的宽高始终只读
@@ -769,6 +781,10 @@ public class RDPSettingsViewController: NSViewController {
             customWidthField.stringValue = "\(settings.resolution.width)"
             customHeightField.stringValue = "\(settings.resolution.height)"
             
+            // 显示自定义分辨率输入框（因为选择了自定义分辨率）
+            customWidthField.isHidden = false
+            customHeightField.isHidden = false
+            
             // 根据自动检测状态决定是否启用输入框
             let isAutoDetectionEnabled = autoDetectionCheckbox?.state == .on
             if isAutoDetectionEnabled == true {
@@ -783,6 +799,11 @@ public class RDPSettingsViewController: NSViewController {
         } else {
             customWidthField.stringValue = ""
             customHeightField.stringValue = ""
+            
+            // 隐藏自定义分辨率输入框（因为选择了预设分辨率）
+            customWidthField.isHidden = true
+            customHeightField.isHidden = true
+            
             customWidthField.isEnabled = false
             customHeightField.isEnabled = false
         }
