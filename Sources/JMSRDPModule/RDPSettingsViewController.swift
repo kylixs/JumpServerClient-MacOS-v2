@@ -1061,8 +1061,8 @@ public class RDPSettingsViewController: NSViewController {
         // 获取HiDPI设置
         let hiDPI = HiDPISettings(
             enabled: hiDPICheckbox.state == .on,
-            scaleFactor: customScaleFactorField.doubleValue > 0 ? customScaleFactorField.doubleValue : scaleFactorSlider.doubleValue,
-            autoDetect: autoDetectionCheckbox.state == .on,
+            scaleFactor: getScaleFactorFromUI(),
+            autoDetect: true, // 简化界面中默认启用自动检测
             forceHiDPI: false
         )
         
@@ -1079,6 +1079,39 @@ public class RDPSettingsViewController: NSViewController {
             hiDPI: hiDPI,
             useAutoDetection: autoDetectionCheckbox.state == .on
         )
+    }
+    
+    /// 从UI获取缩放因子
+    private func getScaleFactorFromUI() -> Double {
+        // 在简化界面中，从缩放下拉菜单获取缩放因子
+        if let scalePopup = view.subviews.compactMap({ $0 as? NSPopUpButton }).first(where: { popup in
+            popup.itemTitles.contains("150%")
+        }) {
+            let scaleValues = [1.0, 1.25, 1.5, 2.0]
+            let selectedIndex = scalePopup.indexOfSelectedItem
+            if selectedIndex >= 0 && selectedIndex < scaleValues.count {
+                return scaleValues[selectedIndex]
+            }
+        }
+        
+        // 如果找不到缩放控件，返回默认值
+        return 1.5 // 默认150%缩放
+    }
+    
+    /// 根据缩放因子更新缩放下拉菜单
+    private func updateScalePopupFromSettings(_ scaleFactor: Double) {
+        if let scalePopup = view.subviews.compactMap({ $0 as? NSPopUpButton }).first(where: { popup in
+            popup.itemTitles.contains("150%")
+        }) {
+            let scaleValues = [1.0, 1.25, 1.5, 2.0]
+            if let index = scaleValues.firstIndex(of: scaleFactor) {
+                scalePopup.selectItem(at: index)
+            } else {
+                // 如果不是标准值，选择最接近的
+                let closestIndex = scaleValues.enumerated().min { abs($0.element - scaleFactor) < abs($1.element - scaleFactor) }?.offset ?? 2
+                scalePopup.selectItem(at: closestIndex)
+            }
+        }
     }
     
     private func updateUIWithSettings(_ settings: RDPSettings) {
@@ -1115,18 +1148,17 @@ public class RDPSettingsViewController: NSViewController {
         }
         
         // 更新HiDPI设置
-        hiDPICheckbox.state = settings.hiDPI.enabled ? .on : .off
-        scaleFactorSlider.doubleValue = settings.hiDPI.scaleFactor
-        customScaleFactorField.doubleValue = settings.hiDPI.scaleFactor
-        scaleFactorStepper.doubleValue = settings.hiDPI.scaleFactor
-        scaleFactorSlider.isEnabled = settings.hiDPI.enabled
-        updateScaleFactorLabel()
+        hiDPICheckbox?.state = settings.hiDPI.enabled ? .on : .off
         
-        autoDetectionCheckbox.state = settings.useAutoDetection ? .on : .off
+        // 更新缩放设置（在简化界面中通过缩放下拉菜单）
+        updateScalePopupFromSettings(settings.hiDPI.scaleFactor)
         
-        // 更新压缩级别
-        compressionSlider.doubleValue = Double(settings.compressionLevel)
-        updateCompressionLabel()
+        // 更新分辨率模式选择（简化界面中跳过）
+        // 在简化界面中，分辨率模式通过其他方式处理
+        
+        // 更新压缩级别（简化界面中没有压缩滑块，跳过）
+        // compressionSlider.doubleValue = Double(settings.compressionLevel)
+        // updateCompressionLabel()
         
         // 更新颜色深度
         let colorDepths = [16, 24, 32]
