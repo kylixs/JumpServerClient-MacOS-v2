@@ -17,6 +17,8 @@
 
 **文件列表**:
 - `register_jms_protocol.sh` - 注册 jms:// 协议处理程序
+- `check_jms_protocol.py` - 检查 jms:// 协议注册状态和处理程序位置 🆕
+- `cleanup_jms_handlers.py` - 清理冲突的协议处理程序
 - `deploy_package.swift` - 应用程序打包和部署准备
 - `卸载脚本.sh` - 卸载应用程序和清理系统
 
@@ -25,6 +27,7 @@
 
 **文件列表**:
 - `test_jms_protocol.sh` - 测试 jms:// 协议注册和功能
+- `test_rdp_url.txt` - 测试用的RDP URL
 
 ## 🔧 脚本使用指南
 
@@ -40,10 +43,16 @@
 ./scripts/build/clean.sh
 ```
 
-### 部署应用程序
+### 部署和协议管理
 ```bash
 # 注册 jms:// 协议
 ./scripts/deployment/register_jms_protocol.sh
+
+# 检查协议注册状态
+python3 scripts/deployment/check_jms_protocol.py
+
+# 清理冲突的处理程序
+python3 scripts/deployment/cleanup_jms_handlers.py
 
 # 准备部署包
 swift scripts/deployment/deploy_package.swift
@@ -73,6 +82,28 @@ swift scripts/deployment/deploy_package.swift
 - 使用 lsregister 注册协议
 - 验证注册结果
 - 提供故障排除建议
+
+### check_jms_protocol.py 🆕
+**功能**: 检查 jms:// 协议注册状态和处理程序位置
+**用法**: `python3 check_jms_protocol.py`
+
+**检查内容**:
+- 准确解析Launch Services数据库
+- 显示所有jms协议处理程序的完整路径
+- 检查应用程序状态（存在/垃圾桶/活跃）
+- 显示应用版本和Bundle ID信息
+- 提供冲突检测和处理建议
+- 包含协议测试命令
+
+### cleanup_jms_handlers.py
+**功能**: 清理冲突的 jms:// 协议处理程序
+**用法**: `python3 cleanup_jms_handlers.py`
+
+**主要功能**:
+- 检测重复的协议处理程序
+- 清理过期的注册信息
+- 解决协议冲突问题
+- 重置协议处理优先级
 
 ### test_jms_protocol.sh
 **功能**: 测试 jms:// 协议是否正确注册和工作
