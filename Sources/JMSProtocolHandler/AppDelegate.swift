@@ -14,6 +14,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // URL处理标志
     private var hasProcessedURL = false
+    private var isLaunchedByURL = false
+    private var pendingURL: String?
     
     // 服务组件
     private let urlParser = URLParser()
@@ -27,21 +29,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // MARK: - 应用程序生命周期
     
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        logInfo("🚀 applicationWillFinishLaunching 开始执行")
+        logInfo("📋 通知对象: \(notification)")
+        
+        // 尽早注册URL事件处理 - 这是关键！
+        logInfo("🔗 [EARLY] 注册Apple Events URL处理器...")
+        logInfo("📋 [EARLY] 注册详情: eventClass=\(kInternetEventClass), eventID=\(kAEGetURL)")
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleURLEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+        logInfo("✅ [EARLY] Apple Events URL处理器注册完成")
+        
+        logInfo("✅ applicationWillFinishLaunching 执行完成")
+    }
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 使用新的日志组件记录应用启动
         LogManager.shared.logAppStart()
         
+        logInfo("🚀 applicationDidFinishLaunching 开始执行")
+        logInfo("📋 通知对象: \(notification)")
+        
         // 设置应用程序为普通应用，显示在Dock中
+        logInfo("🎯 设置应用程序激活策略...")
         NSApp.setActivationPolicy(.regular)
+        logInfo("✅ 应用程序激活策略设置完成")
         
         // 创建状态栏项目
+        logInfo("📊 创建状态栏项目...")
         setupStatusBarItem()
+        logInfo("✅ 状态栏项目创建完成")
         
         // 设置主菜单
+        logInfo("📋 设置主菜单...")
         setupMainMenu()
+        logInfo("✅ 主菜单设置完成")
         
-        // 注册URL事件处理
+        // 注册URL事件处理 - 尽早注册
         logInfo("🔗 注册Apple Events URL处理器...")
+        logInfo("📋 注册详情: eventClass=\(kInternetEventClass), eventID=\(kAEGetURL)")
         NSAppleEventManager.shared().setEventHandler(
             self,
             andSelector: #selector(handleURLEvent(_:withReplyEvent:)),
@@ -51,8 +81,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logInfo("✅ Apple Events URL处理器注册完成")
         
         // 检查是否有命令行参数传入的URL
-        logDebug("🔍 开始检查命令行参数...")
+        logInfo("🔍 开始检查命令行参数...")
         handleCommandLineArguments()
+        logInfo("✅ 命令行参数检查完成")
+        
+        // 标记应用程序启动完成
+        hasProcessedURL = true
+        logInfo("✅ 应用程序启动完成标记已设置")
+        
+        // 处理待处理的URL（如果有）
+        if let url = pendingURL {
+            logInfo("🔄 处理待处理的URL: \(url)")
+            DispatchQueue.main.async {
+                self.processJMSURL(url)
+                self.pendingURL = nil
+                logInfo("✅ 待处理URL处理完成")
+            }
+        }
         
         // 确保应用程序激活
         DispatchQueue.main.async {
@@ -60,12 +105,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let arguments = CommandLine.arguments
             let hasURLArgument = arguments.contains { $0.hasPrefix("jms://") }
             
-            logDebug("🎯 检查是否需要激活应用程序: hasURLArgument=\(hasURLArgument)")
-            if hasURLArgument {
-                logDebug("🎯 激活应用程序...")
+            logInfo("🎯 检查是否需要激活应用程序: hasURLArgument=\(hasURLArgument), isLaunchedByURL=\(self.isLaunchedByURL)")
+            if hasURLArgument || self.isLaunchedByURL {
+                logInfo("🎯 激活应用程序...")
                 NSApp.activate(ignoringOtherApps: true)
+                logInfo("✅ 应用程序激活完成")
             }
         }
+        
+        logInfo("🎉 applicationDidFinishLaunching 执行完成")
     }
     
     func applicationWillTerminate(_ notification: Notification) {
@@ -434,47 +482,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func handleURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
         logInfo("🎯 handleURLEvent() 被调用")
-        logDebug("📅 事件时间: \(Date())")
-        logDebug("📋 事件描述: \(event)")
+        logInfo("📅 事件时间: \(Date())")
+        logInfo("📋 事件描述: \(event)")
+        logInfo("📋 回复事件: \(replyEvent)")
+        logInfo("📊 应用程序状态: isActive=\(NSApp.isActive), isRunning=\(NSApp.isRunning)")
+        logInfo("📊 应用程序完成启动: \(hasProcessedURL ? "是" : "否")")
         
         guard let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue else {
             logError("❌ 无法从Apple Event中获取URL参数")
+            logError("📋 事件参数详情: \(event.paramDescriptor(forKeyword: keyDirectObject) ?? NSAppleEventDescriptor())")
             errorHandler.handleJMSError(.invalidURL("无法获取URL参数"))
             return
         }
         
         logInfo("✅ 从Apple Event接收到URL: \(urlString)")
+        
+        // 标记应用程序是由URL启动的
+        isLaunchedByURL = true
+        
+        // 如果应用程序还没有完全启动，保存URL稍后处理
+        if !hasProcessedURL {
+            logInfo("⏳ 应用程序尚未完全启动，保存URL稍后处理")
+            pendingURL = urlString
+            return
+        }
+        
+        logInfo("🔄 开始处理URL...")
         processJMSURL(urlString)
+        logInfo("✅ URL处理完成")
     }
     
     private func handleCommandLineArguments() {
         let arguments = CommandLine.arguments
-        logDebug("🔍 handleCommandLineArguments() 开始执行")
-        logDebug("📝 当前命令行参数: \(arguments)")
+        logInfo("🔍 handleCommandLineArguments() 开始执行")
+        logInfo("📝 当前命令行参数: \(arguments)")
+        logInfo("📊 参数数量: \(arguments.count)")
         
         // 查找URL参数
         var foundJMSURL = false
         for (index, argument) in arguments.enumerated() {
-            logDebug("🔍 检查参数[\(index)]: \(argument)")
+            logInfo("🔍 检查参数[\(index)]: \(argument)")
             if argument.hasPrefix("jms://") {
                 logInfo("✅ 发现JMS URL参数: \(argument)")
                 foundJMSURL = true
+                logInfo("🔄 开始处理命令行URL...")
                 processJMSURL(argument)
+                logInfo("✅ 命令行URL处理完成")
                 return
             }
         }
         
         if !foundJMSURL {
-            logDebug("❌ 未发现JMS URL参数")
+            logInfo("❌ 未发现JMS URL参数")
         }
         
         // 如果没有URL参数，显示状态信息
         if arguments.count <= 1 {
-            logDebug("📊 参数数量 <= 1，显示状态信息")
+            logInfo("📊 参数数量 <= 1，显示状态信息")
             showStatusInfo()
         } else {
-            logDebug("📊 参数数量 > 1 但无JMS URL，不显示状态信息")
+            logInfo("📊 参数数量 > 1 但无JMS URL，不显示状态信息")
         }
+        
+        logInfo("✅ handleCommandLineArguments() 执行完成")
     }
     
     // MARK: - JMS URL处理

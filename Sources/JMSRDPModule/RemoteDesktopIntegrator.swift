@@ -99,14 +99,21 @@ public class RemoteDesktopIntegrator {
             }
         }
         
-        // 尝试通过Bundle ID查找
+        // 尝试通过Bundle ID查找，但需要验证文件实际存在
         logDebug("🔍 通过Bundle ID查找: com.microsoft.rdc.macos")
         if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") {
-            logDebug("✅ 通过Bundle ID找到Microsoft Remote Desktop: \(appURL.path)")
-            return // 通过Bundle ID找到了
+            logDebug("🔍 Bundle ID返回路径: \(appURL.path)")
+            // 验证应用程序文件实际存在
+            if fileManager.fileExists(atPath: appURL.path) {
+                logDebug("✅ 通过Bundle ID找到Microsoft Remote Desktop: \(appURL.path)")
+                return // 通过Bundle ID找到了且文件存在
+            } else {
+                logDebug("⚠️ Bundle ID返回路径但文件不存在: \(appURL.path)")
+            }
         }
         
         logError("❌ 未找到Microsoft Remote Desktop应用程序")
+        logError("💡 请从Mac App Store安装Microsoft Remote Desktop")
         throw JMSError.remoteDesktopNotFound
     }
     
@@ -114,12 +121,7 @@ public class RemoteDesktopIntegrator {
     /// - Returns: 应用程序路径
     /// - Throws: JMSError.remoteDesktopNotFound
     public func getRemoteDesktopPath() throws -> URL {
-        // 首先尝试通过Bundle ID查找
-        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") {
-            return appURL
-        }
-        
-        // 然后尝试常见路径
+        // 首先尝试常见路径
         let possiblePaths = [
             "/Applications/Microsoft Remote Desktop.app",
             "/System/Applications/Microsoft Remote Desktop.app",
@@ -130,6 +132,14 @@ public class RemoteDesktopIntegrator {
         for path in possiblePaths {
             if fileManager.fileExists(atPath: path) {
                 return URL(fileURLWithPath: path)
+            }
+        }
+        
+        // 然后尝试通过Bundle ID查找，但需要验证文件实际存在
+        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.rdc.macos") {
+            // 验证应用程序文件实际存在
+            if fileManager.fileExists(atPath: appURL.path) {
+                return appURL
             }
         }
         
