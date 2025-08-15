@@ -38,12 +38,13 @@ public class RDPSettingsViewController: NSViewController {
     private var resolutionPopup: NSPopUpButton!
     private var customWidthField: NSTextField!
     private var customHeightField: NSTextField!
+    private var customLabel: NSTextField!      // 新增：自定义分辨率标签
+    private var xLabel: NSTextField!           // 新增：×符号标签
     private var hiDPICheckbox: NSButton!
     private var scaleFactorSlider: NSSlider!
     private var scaleFactorLabel: NSTextField!
     private var autoDetectionCheckbox: NSButton!
     private var displayInfoLabel: NSTextField!
-    private var bandwidthLabel: NSTextField!
     
     // 新增：自定义缩放因子组件
     private var customScaleFactorField: NSTextField!
@@ -191,12 +192,6 @@ public class RDPSettingsViewController: NSViewController {
         customHeightField.frame = NSRect(x: 190, y: 370, width: 80, height: 25)  // 从390调整到370
         customHeightField.isEnabled = false
         view.addSubview(customHeightField)
-        
-        // 带宽需求显示
-        bandwidthLabel = NSTextField(labelWithString: "预计带宽: 5-10 Mbps")
-        bandwidthLabel.frame = NSRect(x: 290, y: 370, width: 200, height: 20)  // 从390调整到370
-        bandwidthLabel.textColor = NSColor.secondaryLabelColor
-        view.addSubview(bandwidthLabel)
     }
     
     private func setupHiDPIControls() {
@@ -481,40 +476,8 @@ public class RDPSettingsViewController: NSViewController {
         scaleFactorStepper.isEnabled = hiDPIEnabled
         
         updateScaleFactorLabel()
-        updateBandwidthDisplay()
         
         print("🖥️ 已应用显示器配置 - 分辨率: \(display.width)×\(display.height), HiDPI: \(display.isHiDPI), 实际缩放: \(actualScaleFactor)")
-    }
-    
-    private func updateBandwidthDisplay() {
-        // 根据当前设置计算预计带宽需求
-        let width = Int(customWidthField.stringValue) ?? 1920
-        let height = Int(customHeightField.stringValue) ?? 1080
-        let colorDepth = (colorDepthPopup.indexOfSelectedItem + 1) * 8 + 8 // 16, 24, 32
-        let compression = compressionSlider.intValue
-        
-        // 简化的带宽计算
-        let pixelCount = width * height
-        let bitsPerPixel = colorDepth
-        let totalBits = Double(pixelCount) * Double(bitsPerPixel)
-        let rawBandwidth = totalBits / 8.0 / 1024.0 / 1024.0 * 30.0 // 30fps
-        
-        // 应用压缩因子
-        let compressionFactor: Double
-        switch compression {
-        case 0: compressionFactor = 1.0      // 无压缩
-        case 1: compressionFactor = 0.3      // 中等压缩
-        case 2: compressionFactor = 0.1      // 高压缩
-        default: compressionFactor = 0.3
-        }
-        
-        let estimatedBandwidth = rawBandwidth * compressionFactor
-        
-        if estimatedBandwidth < 1.0 {
-            bandwidthLabel.stringValue = String(format: "预计带宽: %.1f Kbps", estimatedBandwidth * 1024)
-        } else {
-            bandwidthLabel.stringValue = String(format: "预计带宽: %.1f Mbps", estimatedBandwidth)
-        }
     }
     
     // MARK: - 辅助方法
@@ -686,7 +649,6 @@ public class RDPSettingsViewController: NSViewController {
         let currentSettings = getCurrentSettingsFromUI()
         settingsManager.updateSettings(currentSettings)
         delegate?.settingsDidChange(currentSettings)
-        updateBandwidthDisplay()
     }
     
     // MARK: - 数据管理
@@ -866,9 +828,6 @@ public class RDPSettingsViewController: NSViewController {
         wallpaperCheckbox.state = settings.enableWallpaper ? .on : .off
         animationsCheckbox.state = settings.enableMenuAnimations ? .on : .off
         themesCheckbox.state = settings.enableThemes ? .on : .off
-        
-        // 更新带宽显示
-        updateBandwidthDisplay()
     }
     
     private func updateCompressionLabel() {
