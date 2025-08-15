@@ -38,8 +38,6 @@ public class RDPSettingsViewController: NSViewController {
     private var resolutionPopup: NSPopUpButton!
     private var customWidthField: NSTextField!
     private var customHeightField: NSTextField!
-    private var customLabel: NSTextField!      // 新增：自定义分辨率标签
-    private var xLabel: NSTextField!           // 新增：×符号标签
     private var hiDPICheckbox: NSButton!
     private var scaleFactorSlider: NSSlider!
     private var scaleFactorLabel: NSTextField!
@@ -168,11 +166,6 @@ public class RDPSettingsViewController: NSViewController {
         resolutionPopup.frame = NSRect(x: 130, y: 395, width: 180, height: 25)  // 从420调整到395
         view.addSubview(resolutionPopup)
         
-        // 自定义分辨率输入 - 调整位置避免重叠
-        let customLabel = NSTextField(labelWithString: "自定义:")
-        customLabel.frame = NSRect(x: 20, y: 370, width: 60, height: 20)  // 从390调整到370
-        view.addSubview(customLabel)
-        
         customWidthField = NSTextField()
         customWidthField.placeholderString = "宽度"
         customWidthField.target = self
@@ -180,10 +173,6 @@ public class RDPSettingsViewController: NSViewController {
         customWidthField.frame = NSRect(x: 80, y: 370, width: 80, height: 25)  // 从390调整到370
         customWidthField.isEnabled = false
         view.addSubview(customWidthField)
-        
-        let xLabel = NSTextField(labelWithString: "×")
-        xLabel.frame = NSRect(x: 170, y: 370, width: 15, height: 20)  // 从390调整到370
-        view.addSubview(xLabel)
         
         customHeightField = NSTextField()
         customHeightField.placeholderString = "高度"
