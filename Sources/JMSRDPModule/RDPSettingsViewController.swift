@@ -160,13 +160,13 @@ public class RDPSettingsViewController: NSViewController {
         view.addSubview(resolutionSectionLabel)
         
         // 分辨率模式选择（二选一）
-        let autoDetectRadio = NSButton(radioButtonWithTitle: "自动检测", target: self, action: #selector(resolutionModeChanged(_:)))
+        autoDetectRadio = NSButton(radioButtonWithTitle: "自动检测", target: self, action: #selector(resolutionModeChanged(_:)))
         autoDetectRadio.frame = NSRect(x: 20, y: 545, width: 100, height: 20)
         autoDetectRadio.state = .on // 默认选择自动检测
         autoDetectRadio.tag = 1000
         view.addSubview(autoDetectRadio)
         
-        let manualSetRadio = NSButton(radioButtonWithTitle: "手动设置", target: self, action: #selector(resolutionModeChanged(_:)))
+        manualSetRadio = NSButton(radioButtonWithTitle: "手动设置", target: self, action: #selector(resolutionModeChanged(_:)))
         manualSetRadio.frame = NSRect(x: 130, y: 545, width: 100, height: 20)
         manualSetRadio.state = .off
         manualSetRadio.tag = 1001
@@ -177,10 +177,6 @@ public class RDPSettingsViewController: NSViewController {
         
         // 手动设置模式区域
         setupManualSetArea()
-        
-        // 存储单选按钮引用
-        self.autoDetectRadio = autoDetectRadio
-        self.manualSetRadio = manualSetRadio
     }
     
     private func setupAutoDetectArea() {
@@ -1040,9 +1036,9 @@ public class RDPSettingsViewController: NSViewController {
             useAutoDetection: autoDetectRadio.state == .on,
             enableSmartSizing: smartSizingCheckbox.state == .on,
             screenModeId: screenModePopup.indexOfSelectedItem + 1, // 1=窗口, 2=全屏
-            enableAutoResize: autoResizeCheckbox.state == .on,
-            enableDesktopComposition: desktopCompositionCheckbox.state == .on,
-            enableRemoteFX: remoteFXCheckbox.state == .on
+            enableAutoResize: false, // 简化界面中没有这个选项
+            enableDesktopComposition: false, // 简化界面中没有这个选项
+            enableRemoteFX: false // 简化界面中没有这个选项
         )
     }
     
