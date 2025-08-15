@@ -45,14 +45,6 @@ public class RDPSettingsViewController: NSViewController {
     private var displayInfoLabel: NSTextField!
     private var bandwidthLabel: NSTextField!
     
-    // 新增：多显示器支持组件
-    private var displaySelectionPopup: NSPopUpButton!
-    private var refreshDisplaysButton: NSButton!
-    private var displayInfoPanel: NSView!
-    private var displayNameLabel: NSTextField!
-    private var displaySpecsLabel: NSTextField!
-    private var recommendationLabel: NSTextField!
-    
     // 新增：自定义缩放因子组件
     private var customScaleFactorField: NSTextField!
     private var scaleFactorStepper: NSStepper!
@@ -100,19 +92,14 @@ public class RDPSettingsViewController: NSViewController {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.autoDetectionChanged(self?.autoDetectionCheckbox ?? NSButton())
             }
-        } else {
-            // 手动模式下，刷新显示器列表
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.refreshDisplaysAndSelectFirst()
-            }
         }
+        // 手动模式下不再需要刷新显示器列表
     }
     
     // MARK: - UI设置
     private func setupUI() {
         setupTitleAndProfile()
         setupAutoDetectionControls()  // 将自动检测放到第一行
-        setupDisplaySelection()
         setupResolutionControls()
         setupHiDPIControls()
         setupCompressionControls()
@@ -120,71 +107,6 @@ public class RDPSettingsViewController: NSViewController {
         setupEffectControls()
         setupActionButtons()
         setupStatusLabel()
-    }
-    
-    private func setupDisplaySelection() {
-        // 显示器选择区域标题
-        let displaySectionLabel = NSTextField(labelWithString: "手动显示器选择")
-        displaySectionLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        displaySectionLabel.frame = NSRect(x: 20, y: 620, width: 150, height: 20)
-        view.addSubview(displaySectionLabel)
-        
-        // 显示器选择下拉菜单
-        displaySelectionPopup = NSPopUpButton()
-        displaySelectionPopup.target = self
-        displaySelectionPopup.action = #selector(displaySelectionChanged(_:))
-        displaySelectionPopup.frame = NSRect(x: 20, y: 590, width: 320, height: 25)
-        view.addSubview(displaySelectionPopup)
-        
-        // 应用推荐按钮（显示器右侧）
-        let applyDisplayConfigButton = NSButton(title: "应用推荐", target: self, action: #selector(applySelectedDisplayConfig(_:)))
-        applyDisplayConfigButton.bezelStyle = .rounded
-        applyDisplayConfigButton.frame = NSRect(x: 350, y: 590, width: 80, height: 25)
-        applyDisplayConfigButton.toolTip = "应用选定显示器的推荐RDP配置"
-        view.addSubview(applyDisplayConfigButton)
-        
-        // 刷新显示器按钮
-        refreshDisplaysButton = NSButton(title: "刷新", target: self, action: #selector(refreshDisplays(_:)))
-        refreshDisplaysButton.bezelStyle = .rounded
-        refreshDisplaysButton.frame = NSRect(x: 440, y: 590, width: 60, height: 25)
-        view.addSubview(refreshDisplaysButton)
-        
-        // 显示器信息面板（调整位置避免重叠）
-        displayInfoPanel = NSView()
-        displayInfoPanel.frame = NSRect(x: 20, y: 480, width: 540, height: 100)
-        displayInfoPanel.wantsLayer = true
-        displayInfoPanel.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        displayInfoPanel.layer?.cornerRadius = 6
-        view.addSubview(displayInfoPanel)
-        
-        // 显示器名称标签
-        displayNameLabel = NSTextField(labelWithString: "未选择显示器")
-        displayNameLabel.font = NSFont.boldSystemFont(ofSize: 12)
-        displayNameLabel.frame = NSRect(x: 10, y: 75, width: 520, height: 20)
-        displayInfoPanel.addSubview(displayNameLabel)
-        
-        // 显示器规格标签
-        displaySpecsLabel = NSTextField(labelWithString: "请选择显示器以查看详细信息")
-        displaySpecsLabel.font = NSFont.systemFont(ofSize: 11)
-        displaySpecsLabel.textColor = NSColor.secondaryLabelColor
-        displaySpecsLabel.frame = NSRect(x: 10, y: 55, width: 520, height: 15)
-        displayInfoPanel.addSubview(displaySpecsLabel)
-        
-        // 推荐配置标签
-        recommendationLabel = NSTextField(labelWithString: "")
-        recommendationLabel.font = NSFont.systemFont(ofSize: 11)
-        recommendationLabel.textColor = NSColor.systemBlue
-        recommendationLabel.frame = NSRect(x: 10, y: 35, width: 520, height: 15)
-        displayInfoPanel.addSubview(recommendationLabel)
-        
-        // 详细信息标签
-        let detailInfoLabel = NSTextField(labelWithString: "")
-        detailInfoLabel.font = NSFont.systemFont(ofSize: 10)
-        detailInfoLabel.textColor = NSColor.tertiaryLabelColor
-        detailInfoLabel.frame = NSRect(x: 10, y: 15, width: 520, height: 15)
-        displayInfoPanel.addSubview(detailInfoLabel)
-        
-        logInfo("📺 显示器选择界面初始化完成，默认未选择显示器")
     }
     
     private func setupTitleAndProfile() {
@@ -435,138 +357,7 @@ public class RDPSettingsViewController: NSViewController {
         view.addSubview(statusLabel)
     }
     
-    // MARK: - 显示器选择事件处理
-    
-    @objc private func displaySelectionChanged(_ sender: NSPopUpButton) {
-        let selectedIndex = sender.indexOfSelectedItem
-        
-        // 如果选择的是"请选择显示器..."（索引0），清空信息显示
-        if selectedIndex == 0 {
-            selectedDisplayIndex = -1
-            clearDisplayInfo()
-            logInfo("📺 用户取消选择显示器")
-            return
-        }
-        
-        // 调整索引（因为第0项是"请选择显示器..."）
-        let displayIndex = selectedIndex - 1
-        selectedDisplayIndex = displayIndex
-        
-        guard displayIndex >= 0 && displayIndex < allDisplays.count else { 
-            logWarning("⚠️ 显示器索引超出范围: \(displayIndex)")
-            return 
-        }
-        
-        let selectedDisplay = allDisplays[displayIndex]
-        
-        logInfo("📺 用户选择显示器: \(selectedDisplay.displayName ?? "未知")，仅显示信息")
-        
-        // 仅更新显示器信息，不应用配置
-        updateDisplayInfo(selectedDisplay)
-        
-        updateStatusLabel("已选择显示器: \(selectedDisplay.displayName ?? "未知显示器")（点击'应用推荐'来应用配置）")
-    }
-    
-    @objc private func applySelectedDisplayConfig(_ sender: NSButton) {
-        guard selectedDisplayIndex >= 0 && selectedDisplayIndex < allDisplays.count else {
-            showAlert("未选择显示器", message: "请先选择一个显示器，然后点击'应用推荐'来应用其配置。")
-            return
-        }
-        
-        let selectedDisplay = allDisplays[selectedDisplayIndex]
-        
-        logInfo("🔧 用户点击应用推荐配置: \(selectedDisplay.displayName ?? "未知")")
-        
-        // 显示确认对话框
-        let alert = NSAlert()
-        alert.messageText = "应用推荐配置"
-        alert.informativeText = """
-        确定要应用以下推荐配置吗？
-        
-        显示器: \(selectedDisplay.displayName ?? "未知")
-        分辨率: \(selectedDisplay.width)×\(selectedDisplay.height)
-        HiDPI: \(selectedDisplay.isHiDPI ? "启用" : "禁用")
-        推荐缩放: \(selectedDisplay.recommendedScaleFactor)x
-        
-        这将修改当前的RDP设置。
-        """
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "应用配置")
-        alert.addButton(withTitle: "取消")
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            // 用户确认应用配置
-            applyDisplayConfiguration(selectedDisplay)
-            settingsChanged()
-            updateStatusLabel("✅ 已应用显示器推荐配置: \(selectedDisplay.displayName ?? "未知显示器")")
-            logInfo("✅ 已应用显示器推荐配置")
-            
-            // 显示成功通知
-            showAlert("配置已应用", message: "显示器推荐配置已成功应用到RDP设置中。")
-        } else {
-            // 用户取消
-            updateStatusLabel("已取消应用配置")
-            logInfo("❌ 用户取消应用显示器配置")
-        }
-    }
-    
-    private func clearDisplayInfo() {
-        displayNameLabel.stringValue = "未选择显示器"
-        displaySpecsLabel.stringValue = "请选择显示器以查看详细信息"
-        recommendationLabel.stringValue = ""
-        
-        // 清空详细信息
-        if displayInfoPanel.subviews.count > 3 {
-            if let detailLabel = displayInfoPanel.subviews[3] as? NSTextField {
-                detailLabel.stringValue = ""
-            }
-        }
-    }
-    
-    @objc private func refreshDisplays(_ sender: NSButton?) {
-        refreshDisplaysWithoutSelection()
-    }
-    
-    private func refreshDisplaysWithoutSelection() {
-        updateStatusLabel("正在刷新显示器列表...")
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            do {
-                let displays = try self?.displayDetector.detectAllDisplays(useLogicalResolution: true) ?? []
-                
-                DispatchQueue.main.async {
-                    self?.allDisplays = displays
-                    self?.updateDisplaySelectionMenuWithoutSelection()
-                    self?.updateStatusLabel("显示器列表已更新，检测到 \(displays.count) 个显示器")
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self?.updateStatusLabel("显示器检测失败: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-    
-    private func refreshDisplaysAndSelectFirst() {
-        updateStatusLabel("正在刷新显示器列表...")
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            do {
-                let displays = try self?.displayDetector.detectAllDisplays(useLogicalResolution: true) ?? []
-                
-                DispatchQueue.main.async {
-                    self?.allDisplays = displays
-                    self?.updateDisplaySelectionMenuAndSelectFirst()
-                    self?.updateStatusLabel("显示器列表已更新，检测到 \(displays.count) 个显示器")
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self?.updateStatusLabel("显示器检测失败: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
+    // MARK: - 新的事件处理方法
     
     // MARK: - 自定义缩放因子事件处理
     
@@ -607,79 +398,7 @@ public class RDPSettingsViewController: NSViewController {
         settingsChanged()
     }
     
-    // MARK: - 显示器管理辅助方法
-    
-    private func updateDisplaySelectionMenu() {
-        updateDisplaySelectionMenuWithoutSelection()
-    }
-    
-    private func updateDisplaySelectionMenuWithoutSelection() {
-        // 确保UI组件已经初始化
-        guard let displaySelectionPopup = displaySelectionPopup else {
-            logWarning("⚠️ 显示器选择菜单尚未初始化，跳过更新")
-            return
-        }
-        
-        displaySelectionPopup.removeAllItems()
-        
-        // 首先添加默认的"请选择显示器"选项
-        displaySelectionPopup.addItem(withTitle: "请选择显示器...")
-        
-        // 添加检测到的显示器
-        for (_, display) in allDisplays.enumerated() {
-            let displayName = getDisplayName(for: display)
-            displaySelectionPopup.addItem(withTitle: displayName)
-        }
-        
-        // 默认选择"请选择显示器"，不自动选择任何显示器
-        displaySelectionPopup.selectItem(at: 0)
-        selectedDisplayIndex = -1 // 表示未选择
-        
-        // 更新显示器信息为未选择状态
-        displayNameLabel.stringValue = "未选择显示器"
-        displaySpecsLabel.stringValue = "请选择显示器以查看详细信息和应用推荐配置"
-        recommendationLabel.stringValue = ""
-        
-        logInfo("📺 显示器菜单已更新，检测到 \(allDisplays.count) 个显示器，默认未选择")
-    }
-    
-    private func updateDisplaySelectionMenuAndSelectFirst() {
-        // 确保UI组件已经初始化
-        guard let displaySelectionPopup = displaySelectionPopup else {
-            logWarning("⚠️ 显示器选择菜单尚未初始化，跳过更新")
-            return
-        }
-        
-        // 清空现有项目
-        displaySelectionPopup.removeAllItems()
-        
-        // 首先添加默认的"请选择显示器"选项
-        displaySelectionPopup.addItem(withTitle: "请选择显示器...")
-        
-        // 添加检测到的显示器
-        for (_, display) in allDisplays.enumerated() {
-            let displayName = getDisplayName(for: display)
-            displaySelectionPopup.addItem(withTitle: displayName)
-        }
-        
-        // 如果有显示器，默认选择第一个显示器
-        if !allDisplays.isEmpty {
-            displaySelectionPopup.selectItem(at: 1) // 选择第一个显示器（索引1，因为索引0是"请选择显示器..."）
-            selectedDisplayIndex = 0 // 第一个显示器的实际索引
-            
-            let firstDisplay = allDisplays[0]
-            updateDisplayInfo(firstDisplay)
-            updateStatusLabel("已默认选择显示器: \(firstDisplay.displayName ?? "未知显示器")（点击'应用推荐'来应用配置）")
-            
-            logInfo("📺 显示器菜单已更新，检测到 \(allDisplays.count) 个显示器，默认选择第一个")
-        } else {
-            // 没有显示器时的处理
-            displaySelectionPopup.selectItem(at: 0)
-            selectedDisplayIndex = -1
-            clearDisplayInfo()
-            logInfo("📺 显示器菜单已更新，未检测到显示器")
-        }
-    }
+    // MARK: - 显示器信息处理
     
     private func getDisplayName(for display: DisplayConfiguration) -> String {
         let displayNumber = allDisplays.firstIndex(where: { $0.displayID == display.displayID }) ?? 0
@@ -688,47 +407,6 @@ public class RDPSettingsViewController: NSViewController {
         let hiDPIIndicator = display.isHiDPI ? " HiDPI" : ""
         
         return "显示器\(displayNumber + 1)\(mainIndicator) - \(display.width)×\(display.height)\(hiDPIIndicator)"
-    }
-    
-    private func updateDisplayInfo(_ display: DisplayConfiguration) {
-        // 确保UI组件已经初始化
-        guard let displayNameLabel = displayNameLabel,
-              let displaySpecsLabel = displaySpecsLabel,
-              let recommendationLabel = recommendationLabel else {
-            logWarning("⚠️ 显示器信息UI组件尚未初始化，跳过更新")
-            return
-        }
-        
-        // 更新显示器名称
-        displayNameLabel.stringValue = getDisplayName(for: display)
-        
-        // 更新显示器规格信息
-        let dpiInfo = display.dpi != nil && display.dpi! > 0 ? String(format: "%.0f DPI", display.dpi!) : "DPI未知"
-        let refreshInfo = display.refreshRate > 0 ? "\(display.refreshRate)Hz" : "刷新率未知"
-        let colorInfo = "\(display.colorDepth)位色彩"
-        
-        displaySpecsLabel.stringValue = "分辨率: \(display.width)×\(display.height) | \(dpiInfo) | \(refreshInfo) | \(colorInfo)"
-        
-        // 更新推荐配置信息
-        let hiDPIStatus = display.isHiDPI ? "启用HiDPI" : "标准显示"
-        let scaleInfo = String(format: "推荐缩放: %.1fx", display.recommendedScaleFactor)
-        let typeInfo = "类型: \(display.displayType.description)"
-        
-        recommendationLabel.stringValue = "\(hiDPIStatus) | \(scaleInfo) | \(typeInfo)"
-        
-        // 更新详细信息（如果有详细信息标签）
-        if displayInfoPanel.subviews.count > 3 {
-            if let detailLabel = displayInfoPanel.subviews[3] as? NSTextField {
-                let builtInInfo = display.isBuiltIn ? "内置显示器" : "外接显示器"
-                let physicalSize = display.physicalSize != nil ? 
-                    String(format: "物理尺寸: %.1f×%.1f mm", display.physicalSize!.width, display.physicalSize!.height) : 
-                    "物理尺寸未知"
-                
-                detailLabel.stringValue = "\(builtInInfo) | \(physicalSize) | 缩放因子: \(display.scaleFactor)x"
-            }
-        }
-        
-        logInfo("📺 显示器信息已更新: \(display.displayName ?? "未知")")
     }
     
     private func getRecommendedScaleFactor(for display: DisplayConfiguration) -> Double {
@@ -838,7 +516,8 @@ public class RDPSettingsViewController: NSViewController {
                 
                 DispatchQueue.main.async {
                     if let config = displayConfig {
-                        self?.updateDisplayInfo(config)
+                        // 不再更新显示器信息UI，只记录日志
+                        print("📺 检测到显示器: \(config.width)×\(config.height)")
                     } else {
                         self?.displayInfoLabel.stringValue = "当前显示器: 检测失败"
                     }
@@ -948,10 +627,6 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateManualControlsState(_ enabled: Bool) {
-        // 显示器选择相关控件
-        displaySelectionPopup?.isEnabled = enabled
-        refreshDisplaysButton?.isEnabled = enabled
-        
         // 分辨率设置相关控件
         resolutionPopup?.isEnabled = enabled
         
@@ -971,13 +646,11 @@ public class RDPSettingsViewController: NSViewController {
         scaleFactorStepper?.isEnabled = enabled && isHiDPIEnabled
         
         // 更新界面视觉反馈
-        displayInfoPanel?.alphaValue = enabled ? 1.0 : 0.6
+        // displayInfoPanel?.alphaValue = enabled ? 1.0 : 0.6
         
-        // 如果禁用手动控件，清空显示器选择
+        // 如果禁用手动控件，重置相关状态
         if !enabled {
-            displaySelectionPopup?.selectItem(at: 0) // 选择"请选择显示器..."
             selectedDisplayIndex = -1
-            clearDisplayInfo()
         }
     }
     
