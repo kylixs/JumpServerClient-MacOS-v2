@@ -91,32 +91,31 @@ public class RDPSettingsViewController: NSViewController {
         view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
         setupUI()
-        loadCurrentSettings()
+        // 注意：不在loadView中调用loadCurrentSettings()，避免访问未初始化的控件
         
         print("✅ RDP设置界面加载完成")
     }
     
     public override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // 确保所有UI控件都已初始化后再加载设置
+        loadCurrentSettings()
         updateStatusLabel("就绪")
         
-        // 初始化控件状态 - 根据autoDetectionCheckbox的状态决定
-        let isAutoDetectionEnabled = autoDetectionCheckbox.state == .on
-        updateManualControlsState(!isAutoDetectionEnabled)
-        
-        logInfo("📱 RDP设置界面已加载，自动检测模式: \(isAutoDetectionEnabled)")
-        
-        // 如果启用自动检测，延迟检测显示器配置
-        if isAutoDetectionEnabled {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.autoDetectionChanged(self?.autoDetectionCheckbox ?? NSButton())
-            }
-        } else {
-            // 手动模式下，刷新显示器列表
+        // 初始化控件状态 - 根据当前设置决定显示模式
+        let settings = settingsManager.currentSettings
+        if settings.useAutoDetection {
+            // 自动检测模式下，刷新显示器列表
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.refreshDisplaysAndSelectFirst()
             }
+        } else {
+            // 手动模式下，确保界面状态正确
+            showResolutionModeArea(autoDetect: false)
         }
+        
+        logInfo("📱 RDP设置界面已加载，自动检测模式: \(settings.useAutoDetection)")
     }
     
     // MARK: - UI设置
@@ -249,6 +248,10 @@ public class RDPSettingsViewController: NSViewController {
         customWidthField.target = self
         customWidthField.action = #selector(customResolutionChanged(_:))
         customWidthField.frame = NSRect(x: 45, y: 0, width: 60, height: 25)
+        customWidthField.isEditable = true
+        customWidthField.isSelectable = true
+        customWidthField.isBezeled = true
+        customWidthField.bezelStyle = .squareBezel
         customResolutionPanel.addSubview(customWidthField)
         
         let heightLabel = NSTextField(labelWithString: "高度:")
@@ -260,7 +263,15 @@ public class RDPSettingsViewController: NSViewController {
         customHeightField.target = self
         customHeightField.action = #selector(customResolutionChanged(_:))
         customHeightField.frame = NSRect(x: 160, y: 0, width: 60, height: 25)
+        customHeightField.isEditable = true
+        customHeightField.isSelectable = true
+        customHeightField.isBezeled = true
+        customHeightField.bezelStyle = .squareBezel
         customResolutionPanel.addSubview(customHeightField)
+        
+        // 初始状态：自定义分辨率输入框禁用（因为默认选择的不是自定义分辨率）
+        customWidthField.isEnabled = false
+        customHeightField.isEnabled = false
     }
     
     private func setupDisplaySettings() {
@@ -754,34 +765,8 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateBandwidthDisplay() {
-        // 根据当前设置计算预计带宽需求
-        let width = Int(customWidthField.stringValue) ?? 1920
-        let height = Int(customHeightField.stringValue) ?? 1080
-        let colorDepth = (colorDepthPopup.indexOfSelectedItem + 1) * 8 + 8 // 16, 24, 32
-        let compression = compressionSlider.intValue
-        
-        // 简化的带宽计算
-        let pixelCount = width * height
-        let bitsPerPixel = colorDepth
-        let totalBits = Double(pixelCount) * Double(bitsPerPixel)
-        let rawBandwidth = totalBits / 8.0 / 1024.0 / 1024.0 * 30.0 // 30fps
-        
-        // 应用压缩因子
-        let compressionFactor: Double
-        switch compression {
-        case 0: compressionFactor = 1.0      // 无压缩
-        case 1: compressionFactor = 0.3      // 中等压缩
-        case 2: compressionFactor = 0.1      // 高压缩
-        default: compressionFactor = 0.3
-        }
-        
-        let estimatedBandwidth = rawBandwidth * compressionFactor
-        
-        if estimatedBandwidth < 1.0 {
-            bandwidthLabel.stringValue = String(format: "预计带宽: %.1f Kbps", estimatedBandwidth * 1024)
-        } else {
-            bandwidthLabel.stringValue = String(format: "预计带宽: %.1f Mbps", estimatedBandwidth)
-        }
+        // 简化界面中没有带宽显示标签，直接返回
+        return
     }
     
     // MARK: - 辅助方法
@@ -816,7 +801,20 @@ public class RDPSettingsViewController: NSViewController {
             customResolutionPanel.isHidden = !isCustom
         }
         
-        if !isCustom {
+        // 启用/禁用自定义分辨率输入框
+        if isCustom {
+            customWidthField?.isEnabled = true
+            customHeightField?.isEnabled = true
+            // 设置默认值（如果为空）
+            if customWidthField?.stringValue.isEmpty == true {
+                customWidthField?.stringValue = "1920"
+            }
+            if customHeightField?.stringValue.isEmpty == true {
+                customHeightField?.stringValue = "1080"
+            }
+        } else {
+            customWidthField?.isEnabled = false
+            customHeightField?.isEnabled = false
             customWidthField?.stringValue = ""
             customHeightField?.stringValue = ""
         }
@@ -953,10 +951,8 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateScaleFactorLabel() {
-        // 使用精确值输入框的值，如果为空则使用滑块的值
-        let scaleFactor = customScaleFactorField.doubleValue > 0 ? customScaleFactorField.doubleValue : scaleFactorSlider.doubleValue
-        let percentage = Int(scaleFactor * 100)
-        scaleFactorLabel.stringValue = "\(percentage)% (\(String(format: "%.2f", scaleFactor))x)"
+        // 简化界面中没有缩放因子标签，直接返回
+        return
     }
     
     private func settingsChanged() {
@@ -990,6 +986,21 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func getCurrentSettingsFromUI() -> RDPSettings {
+        // 安全检查：确保关键控件已初始化
+        guard let profileSegmentedControl = profileSegmentedControl,
+              let colorDepthPopup = colorDepthPopup,
+              let audioQualityPopup = audioQualityPopup,
+              let resolutionPopup = resolutionPopup,
+              let autoDetectRadio = autoDetectRadio,
+              let hiDPICheckbox = hiDPICheckbox,
+              let fontSmoothingCheckbox = fontSmoothingCheckbox,
+              let wallpaperCheckbox = wallpaperCheckbox,
+              let smartSizingCheckbox = smartSizingCheckbox,
+              let screenModePopup = screenModePopup else {
+            print("⚠️ 警告：UI控件尚未完全初始化，返回默认设置")
+            return settingsManager.currentSettings
+        }
+        
         let profiles = ["性能优先", "平衡模式", "质量优先"]
         let profileName = profiles[profileSegmentedControl.selectedSegment]
         
@@ -1002,8 +1013,8 @@ public class RDPSettingsViewController: NSViewController {
         // 获取分辨率设置
         let resolution: ResolutionSettings
         if resolutionPopup.indexOfSelectedItem == 3 { // 自定义分辨率
-            let width = Int(customWidthField.stringValue) ?? 1920
-            let height = Int(customHeightField.stringValue) ?? 1080
+            let width = Int(customWidthField?.stringValue ?? "1920") ?? 1920
+            let height = Int(customHeightField?.stringValue ?? "1080") ?? 1080
             resolution = ResolutionSettings(width: width, height: height, isCustom: true)
         } else {
             let presets = ResolutionSettings.presets
@@ -1014,11 +1025,11 @@ public class RDPSettingsViewController: NSViewController {
             }
         }
         
-        // 获取HiDPI设置
+        // 获取HiDPI设置（简化版本）
         let hiDPI = HiDPISettings(
             enabled: hiDPICheckbox.state == .on,
-            scaleFactor: customScaleFactorField.doubleValue > 0 ? customScaleFactorField.doubleValue : scaleFactorSlider.doubleValue,
-            autoDetect: autoDetectionCheckbox.state == .on,
+            scaleFactor: 1.5, // 默认缩放因子
+            autoDetect: autoDetectRadio.state == .on,
             forceHiDPI: false
         )
         
@@ -1043,6 +1054,15 @@ public class RDPSettingsViewController: NSViewController {
     }
     
     private func updateUIWithSettings(_ settings: RDPSettings) {
+        // 安全检查：确保关键控件已初始化
+        guard let profileSegmentedControl = profileSegmentedControl,
+              let resolutionPopup = resolutionPopup,
+              let autoDetectRadio = autoDetectRadio,
+              let manualSetRadio = manualSetRadio else {
+            print("⚠️ 警告：UI控件尚未完全初始化，跳过设置更新")
+            return
+        }
+        
         // 更新预设配置选择器
         let profiles = ["性能优先", "平衡模式", "质量优先"]
         if let index = profiles.firstIndex(of: settings.profileName) {
@@ -1076,7 +1096,7 @@ public class RDPSettingsViewController: NSViewController {
         }
         
         // 更新HiDPI设置
-        hiDPICheckbox.state = settings.hiDPI.enabled ? .on : .off
+        hiDPICheckbox?.state = settings.hiDPI.enabled ? .on : .off
         
         // 更新分辨率模式选择
         autoDetectRadio.state = settings.useAutoDetection ? .on : .off
@@ -1086,22 +1106,22 @@ public class RDPSettingsViewController: NSViewController {
         // 更新颜色深度
         let colorDepths = [16, 24, 32]
         if let index = colorDepths.firstIndex(of: settings.colorDepth) {
-            colorDepthPopup.selectItem(at: index)
+            colorDepthPopup?.selectItem(at: index)
         }
         
         // 更新音频质量
         let audioQualities = ["禁用", "低质量", "中等", "高质量"]
         if let index = audioQualities.firstIndex(of: settings.audioQuality) {
-            audioQualityPopup.selectItem(at: index)
+            audioQualityPopup?.selectItem(at: index)
         }
         
         // 更新特效选项
-        fontSmoothingCheckbox.state = settings.enableFontSmoothing ? .on : .off
-        wallpaperCheckbox.state = settings.enableWallpaper ? .on : .off
+        fontSmoothingCheckbox?.state = settings.enableFontSmoothing ? .on : .off
+        wallpaperCheckbox?.state = settings.enableWallpaper ? .on : .off
         
         // 更新高级显示设置
-        smartSizingCheckbox.state = settings.enableSmartSizing ? .on : .off
-        screenModePopup.selectItem(at: settings.screenModeId - 1) // 1=窗口, 2=全屏
+        smartSizingCheckbox?.state = settings.enableSmartSizing ? .on : .off
+        screenModePopup?.selectItem(at: settings.screenModeId - 1) // 1=窗口, 2=全屏
     }
     
     private func updateStatusLabel(_ message: String) {
