@@ -452,8 +452,18 @@ public class RDPSettingsViewController: NSViewController {
         
         // 如果是自定义分辨率，切换到自定义模式
         resolutionPopup.selectItem(at: 3) // "自定义分辨率"
-        customWidthField.isEnabled = true
-        customHeightField.isEnabled = true
+        
+        // 根据自动检测状态决定是否启用输入框
+        let isAutoDetectionEnabled = autoDetectionCheckbox.state == .on
+        if isAutoDetectionEnabled {
+            // 自动检测模式：输入框保持只读
+            customWidthField.isEnabled = false
+            customHeightField.isEnabled = false
+        } else {
+            // 手动模式：可以编辑自定义分辨率
+            customWidthField.isEnabled = true
+            customHeightField.isEnabled = true
+        }
         
         // 更新HiDPI设置
         hiDPICheckbox.state = display.isHiDPI ? .on : .off
@@ -825,8 +835,18 @@ public class RDPSettingsViewController: NSViewController {
             resolutionPopup.selectItem(at: 3) // "自定义分辨率"
             customWidthField.stringValue = "\(settings.resolution.width)"
             customHeightField.stringValue = "\(settings.resolution.height)"
-            customWidthField.isEnabled = true
-            customHeightField.isEnabled = true
+            
+            // 根据自动检测状态决定是否启用输入框
+            let isAutoDetectionEnabled = autoDetectionCheckbox?.state == .on
+            if isAutoDetectionEnabled == true {
+                // 自动检测模式：输入框保持只读
+                customWidthField.isEnabled = false
+                customHeightField.isEnabled = false
+            } else {
+                // 手动模式：可以编辑自定义分辨率
+                customWidthField.isEnabled = true
+                customHeightField.isEnabled = true
+            }
         } else {
             customWidthField.stringValue = ""
             customHeightField.stringValue = ""
