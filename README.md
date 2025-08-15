@@ -47,6 +47,44 @@
 - **架构支持**: Apple Silicon (ARM64) + Intel (x86_64)
 - **磁盘空间**: 50MB 可用空间
 
+## 🔄 macOS自定义协议处理流程
+
+### 时序图
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Browser as 浏览器
+    participant LaunchServices as Launch Services
+    participant App as JMSProtocolHandler
+    participant RDP as Microsoft RD
+    participant Terminal as Terminal/iTerm2
+
+    User->>Browser: 点击 jms:// 链接
+    Browser->>LaunchServices: 请求处理 jms:// 协议
+    LaunchServices->>App: 启动应用并传递URL
+    App->>App: 解析URL和Base64 payload
+    
+    alt RDP协议
+        App->>App: 检测显示器配置
+        App->>App: 生成优化的.rdp文件
+        App->>RDP: 启动Microsoft Remote Desktop
+        RDP-->>User: 建立远程桌面连接
+    else SSH协议
+        App->>App: 检测可用终端
+        App->>Terminal: 启动终端并执行SSH命令
+        Terminal-->>User: 建立SSH会话
+    end
+```
+
+### 核心处理步骤
+
+1. **协议注册**: 应用通过Info.plist注册为jms://协议处理程序
+2. **URL接收**: macOS Launch Services将jms://链接转发给应用
+3. **协议解析**: 解码Base64 payload并识别连接类型
+4. **智能路由**: 根据协议类型分发到相应的处理模块
+5. **连接建立**: 启动对应的客户端应用程序建立连接
+
 ## 🏗️ 项目结构
 
 ```
