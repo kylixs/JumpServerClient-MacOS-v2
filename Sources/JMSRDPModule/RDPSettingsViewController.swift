@@ -148,8 +148,8 @@ public class RDPSettingsViewController: NSViewController {
         resolutionSectionLabel.frame = NSRect(x: 20, y: 420, width: 100, height: 20)  // 从450调整到420
         view.addSubview(resolutionSectionLabel)
         
-        // 分辨率预设选择
-        let resolutionLabel = NSTextField(labelWithString: "预设分辨率:")
+        // 分辨率选择
+        let resolutionLabel = NSTextField(labelWithString: "分辨率:")
         resolutionLabel.frame = NSRect(x: 20, y: 395, width: 100, height: 20)  // 从420调整到395
         view.addSubview(resolutionLabel)
         
