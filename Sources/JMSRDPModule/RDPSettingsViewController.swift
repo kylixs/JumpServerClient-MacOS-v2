@@ -87,11 +87,10 @@ public class RDPSettingsViewController: NSViewController {
         
         logInfo("📱 RDP设置界面已加载，自动检测模式: \(isAutoDetectionEnabled)")
         
-        // 如果启用自动检测，延迟检测显示器配置
+        // 选中'自动检测显示器'时，不能改变'预设分辨率'的选项值及自定义宽高的值
+        // 移除自动应用显示器配置的逻辑，只设置界面状态
         if isAutoDetectionEnabled {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.autoDetectionChanged(self?.autoDetectionCheckbox ?? NSButton())
-            }
+            updateStatusLabel("✅ 自动检测显示器模式已启用")
         }
         // 手动模式下不再需要刷新显示器列表
     }
@@ -611,27 +610,10 @@ public class RDPSettingsViewController: NSViewController {
         // 启用/禁用手动配置控件
         updateManualControlsState(!isAutoDetectionEnabled)
         
-        // 如果启用自动检测，自动检测并应用显示器配置
+        // 选中'自动检测显示器'时，不能改变'预设分辨率'的选项值及自定义宽高的值
+        // 只更新状态标签，不自动应用显示器配置
         if isAutoDetectionEnabled {
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                do {
-                    let displayConfig = try self?.displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
-                    
-                    DispatchQueue.main.async {
-                        if let config = displayConfig {
-                            self?.applyDisplayConfiguration(config)
-                            self?.settingsChanged()
-                            self?.updateStatusLabel("✅ 已自动检测并应用显示器配置")
-                        } else {
-                            self?.updateStatusLabel("⚠️ 自动检测失败，请手动配置")
-                        }
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self?.updateStatusLabel("❌ 显示器检测失败: \(error.localizedDescription)")
-                    }
-                }
-            }
+            updateStatusLabel("✅ 已启用自动检测显示器模式")
         } else {
             updateStatusLabel("已切换到手动配置模式")
         }
