@@ -368,7 +368,7 @@ public class UIInspector {
             parentFrame = superview.frame
             
             // 尝试转换到窗口坐标系
-            if let window = view.window {
+            if view.window != nil {
                 let convertedOrigin = superview.convert(relativeFrame.origin, to: nil)
                 absoluteFrame = NSRect(origin: convertedOrigin, size: relativeFrame.size)
             } else {
