@@ -12,6 +12,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var rdpSettingsWindow: NSWindow?
     private var rdpSettingsViewController: RDPSettingsViewController?
     
+    // 菜单项引用，用于动态更新文字
+    private var statusBarRDPSettingsItem: NSMenuItem?
+    private var appMenuRDPSettingsItem: NSMenuItem?
+    private var rdpSubMenuSettingsItem: NSMenuItem?
+    
     // URL处理标志
     private var hasProcessedURL = false
     private var isLaunchedByURL = false
@@ -145,9 +150,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         
         // RDP设置菜单项
-        let rdpSettingsItem = NSMenuItem(title: "RDP设置...", action: #selector(showRDPSettings), keyEquivalent: ",")
-        rdpSettingsItem.target = self
-        menu.addItem(rdpSettingsItem)
+        statusBarRDPSettingsItem = NSMenuItem(title: "显示RDP设置", action: #selector(showRDPSettings), keyEquivalent: ",")
+        statusBarRDPSettingsItem?.target = self
+        menu.addItem(statusBarRDPSettingsItem!)
         
         // RDP质量配置子菜单
         let qualityMenuItem = NSMenuItem(title: "快速切换质量", action: nil, keyEquivalent: "")
@@ -200,9 +205,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(NSMenuItem.separator())
         
         // RDP设置菜单项
-        let preferencesItem = NSMenuItem(title: "RDP设置...", action: #selector(showRDPSettings), keyEquivalent: ",")
-        preferencesItem.target = self
-        appMenu.addItem(preferencesItem)
+        appMenuRDPSettingsItem = NSMenuItem(title: "显示RDP设置", action: #selector(showRDPSettings), keyEquivalent: ",")
+        appMenuRDPSettingsItem?.target = self
+        appMenu.addItem(appMenuRDPSettingsItem!)
         
         appMenu.addItem(NSMenuItem.separator())
         
@@ -259,9 +264,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rdpMenu.addItem(NSMenuItem.separator())
         
         // 打开设置窗口
-        let settingsItem = NSMenuItem(title: "打开RDP设置...", action: #selector(showRDPSettings), keyEquivalent: "")
-        settingsItem.target = self
-        rdpMenu.addItem(settingsItem)
+        rdpSubMenuSettingsItem = NSMenuItem(title: "显示RDP设置", action: #selector(showRDPSettings), keyEquivalent: "")
+        rdpSubMenuSettingsItem?.target = self
+        rdpMenu.addItem(rdpSubMenuSettingsItem!)
         
         // 重置设置
         let resetItem = NSMenuItem(title: "重置为默认设置", action: #selector(resetToDefaults), keyEquivalent: "")
@@ -315,16 +320,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - GUI动作
     
     @objc private func showRDPSettings() {
-        // 只在窗口不存在时创建，否则直接显示
+        // 如果窗口不存在，创建它
         if rdpSettingsWindow == nil {
             createRDPSettingsWindow()
         }
         
-        // 显示窗口（如果被隐藏了就重新显示）
-        rdpSettingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        // 切换窗口显示/隐藏状态
+        if rdpSettingsWindow?.isVisible == true {
+            // 窗口当前可见，隐藏它
+            rdpSettingsWindow?.orderOut(nil)
+            print("📱 隐藏RDP设置窗口")
+        } else {
+            // 窗口当前隐藏，显示它
+            rdpSettingsWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            print("📱 显示RDP设置窗口")
+        }
         
-        print("📱 显示RDP设置窗口")
+        // 更新菜单项文字
+        updateRDPSettingsMenuItems()
     }
     
     private func createRDPSettingsWindow() {
@@ -351,6 +365,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rdpSettingsWindow?.delegate = self
         
         print("✅ RDP设置窗口创建完成")
+    }
+    
+    private func updateRDPSettingsMenuItems() {
+        let isWindowVisible = rdpSettingsWindow?.isVisible == true
+        let title = isWindowVisible ? "隐藏RDP设置" : "显示RDP设置"
+        
+        // 更新所有菜单项的标题
+        statusBarRDPSettingsItem?.title = title
+        appMenuRDPSettingsItem?.title = title
+        rdpSubMenuSettingsItem?.title = title
+        
+        print("📝 菜单项已更新: \(title)")
     }
     
     private func cleanupRDPSettingsWindow() {
@@ -741,6 +767,8 @@ extension AppDelegate: NSWindowDelegate {
             print("📱 RDP设置窗口请求关闭，隐藏窗口而不释放资源")
             // 隐藏窗口而不是真正关闭
             sender.orderOut(nil)
+            // 更新菜单文字
+            updateRDPSettingsMenuItems()
             return false  // 阻止真正的关闭
         }
         return true
