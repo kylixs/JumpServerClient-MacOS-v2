@@ -118,6 +118,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationWillTerminate(_ notification: Notification) {
         logInfo("JMS Protocol Handler 正在退出")
+        
+        // 应用退出时才真正清理RDP设置窗口资源
+        if rdpSettingsWindow != nil || rdpSettingsViewController != nil {
+            print("🔚 应用退出，清理RDP设置窗口资源")
+            cleanupRDPSettingsWindow()
+        }
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -309,10 +315,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - GUI动作
     
     @objc private func showRDPSettings() {
+        // 只在窗口不存在时创建，否则直接显示
         if rdpSettingsWindow == nil {
             createRDPSettingsWindow()
         }
         
+        // 显示窗口（如果被隐藏了就重新显示）
         rdpSettingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         
@@ -320,6 +328,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func createRDPSettingsWindow() {
+        print("🏗️ 创建RDP设置窗口")
+        
         // 创建RDP设置视图控制器
         rdpSettingsViewController = RDPSettingsViewController()
         rdpSettingsViewController?.delegate = self
@@ -341,6 +351,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rdpSettingsWindow?.delegate = self
         
         print("✅ RDP设置窗口创建完成")
+    }
+    
+    private func cleanupRDPSettingsWindow() {
+        print("🧹 开始清理RDP设置窗口组件")
+        
+        // 安全地清理视图控制器
+        if rdpSettingsViewController != nil {
+            rdpSettingsViewController?.delegate = nil
+            rdpSettingsViewController = nil
+        }
+        
+        // 安全地清理窗口
+        if rdpSettingsWindow != nil {
+            rdpSettingsWindow?.delegate = nil
+            rdpSettingsWindow?.close()
+            rdpSettingsWindow = nil
+        }
+        
+        print("🧹 RDP设置窗口组件清理完成")
+    }
+    
+    private func cleanupRDPSettingsWindowReferences() {
+        print("🧹 开始清理RDP设置窗口引用")
+        
+        // 使用局部变量来避免多次访问实例变量
+        let viewController = rdpSettingsViewController
+        let window = rdpSettingsWindow
+        
+        // 清理引用
+        rdpSettingsViewController = nil
+        rdpSettingsWindow = nil
+        
+        // 如果需要，可以在这里进行额外的清理
+        // 但不要访问已经可能被释放的对象
+        
+        print("🧹 RDP设置窗口引用清理完成 (VC: \(viewController != nil), Window: \(window != nil))")
     }
     
     @objc private func selectRDPQualityPreset(_ sender: NSMenuItem) {
@@ -690,9 +736,27 @@ extension AppDelegate: RDPSettingsViewControllerDelegate {
 
 extension AppDelegate: NSWindowDelegate {
     
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if sender == rdpSettingsWindow {
+            print("📱 RDP设置窗口请求关闭，隐藏窗口而不释放资源")
+            // 隐藏窗口而不是真正关闭
+            sender.orderOut(nil)
+            return false  // 阻止真正的关闭
+        }
+        return true
+    }
+    
     func windowWillClose(_ notification: Notification) {
         if notification.object as? NSWindow == rdpSettingsWindow {
             print("📱 RDP设置窗口即将关闭")
+        }
+    }
+    
+    func windowDidClose(_ notification: Notification) {
+        if notification.object as? NSWindow == rdpSettingsWindow {
+            print("📱 RDP设置窗口已关闭")
+            // 不再清理引用，保持资源可用
+            // cleanupRDPSettingsWindowReferences()
         }
     }
 }

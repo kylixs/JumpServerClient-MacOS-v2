@@ -49,8 +49,43 @@ public class RDPSettingsViewController: NSViewController {
     private var scaleFactorStepper: NSStepper!
     private var scaleFactorPreview: NSTextField!
     
+    // MARK: - 生命周期
+    
+    public override func viewWillDisappear() {
+        super.viewWillDisappear()
+        
+        // 清理所有UI组件的target连接
+        cleanupUITargets()
+    }
+    
+    private func cleanupUITargets() {
+        // 清理所有可能的UI组件target连接
+        view.subviews.forEach { subview in
+            if let button = subview as? NSButton {
+                button.target = nil
+            } else if let slider = subview as? NSSlider {
+                slider.target = nil
+            } else if let popup = subview as? NSPopUpButton {
+                popup.target = nil
+            } else if let segmentedControl = subview as? NSSegmentedControl {
+                segmentedControl.target = nil
+            }
+        }
+        
+        print("🧹 清理UI组件target连接")
+    }
+    
+    deinit {
+        // 确保清理UI组件的target连接
+        cleanupUITargets()
+        
+        // 清理代理引用
+        delegate = nil
+        
+        print("🧹 RDPSettingsViewController 已释放")
+    }
+    
     // 服务和数据
-    private var displayDetector = DisplayDetector()
     private var allDisplays: [DisplayConfiguration] = []
     private var selectedDisplayIndex: Int = 0
     
@@ -492,28 +527,6 @@ public class RDPSettingsViewController: NSViewController {
         print("🖥️ 已应用显示器配置 - 分辨率: \(display.width)×\(display.height), HiDPI: \(display.isHiDPI), 实际缩放: \(actualScaleFactor)")
     }
     
-    // MARK: - 辅助方法
-    private func detectCurrentDisplay() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            do {
-                let displayConfig = try self?.displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
-                
-                DispatchQueue.main.async {
-                    if let config = displayConfig {
-                        // 不再更新显示器信息UI，只记录日志
-                        print("📺 检测到显示器: \(config.width)×\(config.height)")
-                    } else {
-                        self?.displayInfoLabel.stringValue = "当前显示器: 检测失败"
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self?.displayInfoLabel.stringValue = "当前显示器: 检测失败 - \(error.localizedDescription)"
-                }
-            }
-        }
-    }
-    
     // MARK: - 新的事件处理方法
     
     @objc private func resolutionChanged(_ sender: NSPopUpButton) {
@@ -643,17 +656,6 @@ public class RDPSettingsViewController: NSViewController {
 
     
 
-    
-    @objc private func applyRecommendedSettings(_ sender: NSButton) {
-        do {
-            let displayConfig = try displayDetector.detectPrimaryDisplay(useLogicalResolution: true)
-            applyDisplayConfiguration(displayConfig)
-            updateStatusLabel("已应用推荐设置")
-        } catch {
-            updateStatusLabel("无法检测显示器配置")
-            showAlert("检测失败", message: error.localizedDescription)
-        }
-    }
     
     private func updateScaleFactorLabel() {
         // 使用精确值输入框的值，如果为空则使用滑块的值
