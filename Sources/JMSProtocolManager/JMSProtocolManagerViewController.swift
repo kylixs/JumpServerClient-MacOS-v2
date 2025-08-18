@@ -1,7 +1,6 @@
 import Cocoa
 import Foundation
 import JMSCore
-import UIInspector
 
 /// JMS协议管理视图控制器
 public class JMSProtocolManagerViewController: NSViewController {
@@ -306,7 +305,9 @@ public class JMSProtocolManagerViewController: NSViewController {
                     self.handlerViewConstraints.append(bottomConstraint)
                 }
                 
-                self.logger.info("📐 已手动布局 \(self.handlers.count) 个处理器视图")
+                if JMSSettings.enableLayoutLogging {
+                    self.logger.info("📐 已手动布局 \(self.handlers.count) 个处理器视图")
+                }
             }
             
             // 强制更新布局
@@ -326,8 +327,10 @@ public class JMSProtocolManagerViewController: NSViewController {
             self.statusLabel.stringValue = statusText
             self.logger.info("📊 状态更新: \(statusText)")
             
-            self.logger.info("✅ 界面更新完成，手动布局子视图数量: \(self.handlersListView.subviews.count)")
-            self.logger.info("📐 列表项排列: 手动布局确保从顶部到底部排列")
+            if JMSSettings.enableLayoutLogging {
+                self.logger.info("✅ 界面更新完成，手动布局子视图数量: \(self.handlersListView.subviews.count)")
+                self.logger.info("📐 列表项排列: 手动布局确保从顶部到底部排列")
+            }
             
             // 生成更新后的UI分析报告
             self.generateUIAnalysisReport(phase: "数据更新后")
@@ -679,17 +682,19 @@ public class JMSProtocolManagerViewController: NSViewController {
     /// 生成UI分析报告
     /// - Parameter phase: 分析阶段描述
     private func generateUIAnalysisReport(phase: String) {
-        let reportTitle = "JMS协议管理界面分析 - \(phase)"
-        let expectedLayout = """
-        期望布局结构:
-        1. 顶部状态区域 (y: 240-280) - 协议状态标题和信息
-        2. 中间列表区域 (y: 60-230) - 协议处理器列表
-        3. 底部按钮区域 (y: 20-50) - 操作按钮
+        // 只在启用UI分析时执行
+        guard JMSSettings.enableUIAnalysis else { return }
         
-        窗口尺寸: 520x300
-        主要组件: NSTextField(状态), NSScrollView(列表), FlippedContainerView(内容), NSButton(操作)
-        """
+        // 动态导入UIInspector以避免编译时依赖
+        guard NSClassFromString("UIInspector.UIInspector") != nil else {
+            logger.warning("⚠️ UIInspector模块未找到，跳过UI分析")
+            return
+        }
         
+        // 由于UI分析功能已禁用，直接返回
+        logger.info("📊 UI分析功能已禁用 (enableUIAnalysis = false)")
+        
+        /*
         let report = view.generateUIAnalysisReport(title: reportTitle, expectedLayout: expectedLayout)
         
         // 输出报告摘要到日志
@@ -736,11 +741,9 @@ public class JMSProtocolManagerViewController: NSViewController {
                     logger.warning("  ❌ \(regression)")
                 }
             }
-        } else if phase == "初始加载" {
-            self.initialReport = report
-        }
+        */
     }
     
-    /// 存储初始报告用于对比
-    private var initialReport: UIAnalysisReport?
+    /// 存储初始报告用于对比 - 仅在启用UI分析时使用
+    private var initialReport: Any? // 使用Any类型避免UIInspector依赖
 }
