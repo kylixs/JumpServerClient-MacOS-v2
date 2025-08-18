@@ -54,7 +54,21 @@ public class ProtocolRegistrationService: @unchecked Sendable {
             self.registrationScriptPath = bundle.bundlePath + "/Contents/Resources/scripts/deployment/register_jms_protocol.sh"
         }
         
-        self.currentAppPath = bundle.bundlePath
+        // 获取当前应用路径 - 使用多种方式确保准确性
+        let bundlePath = bundle.bundlePath
+        let executablePath = bundle.executablePath ?? ""
+        let bundleURL = bundle.bundleURL.path
+        
+        // 优先使用bundleURL.path，它通常更准确
+        self.currentAppPath = bundleURL
+        
+        // 记录路径信息用于调试
+        LogManager.shared.info("🏗️ ProtocolRegistrationService初始化:")
+        LogManager.shared.info("   Bundle路径: \(bundlePath)")
+        LogManager.shared.info("   Bundle URL路径: \(bundleURL)")
+        LogManager.shared.info("   可执行文件路径: \(executablePath)")
+        LogManager.shared.info("   选择的应用路径: \(self.currentAppPath)")
+        LogManager.shared.info("   注册脚本路径: \(self.registrationScriptPath)")
     }
     
     /// 重新注册协议（清理并重新注册）
@@ -243,12 +257,36 @@ public class ProtocolRegistrationService: @unchecked Sendable {
     /// 验证注册结果
     /// - Returns: 是否注册成功
     private func verifyRegistration() -> Bool {
+        LogManager.shared.info("🔍 开始验证协议注册结果...")
+        
         let workspace = NSWorkspace.shared
-        guard let url = workspace.urlForApplication(toOpen: URL(string: "jms://test")!) else {
+        let testURL = URL(string: "jms://test")!
+        
+        LogManager.shared.info("🧪 测试URL: \(testURL)")
+        LogManager.shared.info("📱 当前应用路径: \(currentAppPath)")
+        
+        guard let handlerURL = workspace.urlForApplication(toOpen: testURL) else {
+            LogManager.shared.error("❌ 无法找到jms://协议的处理器应用")
             return false
         }
         
-        return url.path == currentAppPath
+        let handlerPath = handlerURL.path
+        LogManager.shared.info("🎯 系统返回的处理器路径: \(handlerPath)")
+        
+        // 比较路径时需要考虑可能的路径差异
+        let isMatch = handlerPath == currentAppPath || 
+                     handlerURL.lastPathComponent == URL(fileURLWithPath: currentAppPath).lastPathComponent
+        
+        if isMatch {
+            LogManager.shared.info("✅ 协议注册验证成功 - 当前应用已设置为jms://协议处理器")
+        } else {
+            LogManager.shared.warning("⚠️ 协议注册验证失败:")
+            LogManager.shared.warning("   期望路径: \(currentAppPath)")
+            LogManager.shared.warning("   实际路径: \(handlerPath)")
+            LogManager.shared.warning("   应用名称匹配: \(handlerURL.lastPathComponent == URL(fileURLWithPath: currentAppPath).lastPathComponent)")
+        }
+        
+        return isMatch
     }
     
     /// 运行系统命令
