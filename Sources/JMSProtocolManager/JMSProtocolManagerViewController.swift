@@ -8,12 +8,19 @@ public class JMSProtocolManagerViewController: NSViewController {
     
     // MARK: - UI组件
     private var scrollView: NSScrollView!
-    private var handlersListView: NSStackView!
+    private var handlersListView: NSView!  // 改为普通NSView，手动管理布局
     private var checkStatusButton: NSButton!
     private var reregisterButton: NSButton!
     private var closeButton: NSButton!
     private var statusLabel: NSTextField!
     private var progressIndicator: NSProgressIndicator!
+    
+    // 新增：Auto Layout相关属性
+    private var statusTitleLabel: NSTextField!
+    private var buttonContainer: NSView!
+    
+    // 新增：手动布局管理
+    private var handlerViewConstraints: [NSLayoutConstraint] = []
     
     // MARK: - 服务
     private let detectionService = ProtocolDetectionService.shared
@@ -29,6 +36,10 @@ public class JMSProtocolManagerViewController: NSViewController {
     // MARK: - 生命周期
     public override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // 设置首选内容大小，确保窗口默认高度为300
+        preferredContentSize = NSSize(width: 520, height: 300)
+        
         setupUI()
         
         // 生成初始UI分析报告
@@ -46,75 +57,114 @@ public class JMSProtocolManagerViewController: NSViewController {
         view.wantsLayer = true
         view.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         
+        // 设置视图使用Auto Layout
+        view.translatesAutoresizingMaskIntoConstraints = false
+        
         setupStatusSection()
         setupHandlersList()
         setupActionButtons()
         setupProgressIndicator()
+        setupConstraints()  // 新增：设置Auto Layout约束
         
         logger.info("✅ JMS协议管理视图已加载")
     }
     
     private func setupStatusSection() {
-        // 状态标题 - 从顶部开始布局
+        // 状态标题 - 使用Auto Layout
         let statusTitleLabel = NSTextField(labelWithString: "📡 协议状态")
         statusTitleLabel.font = NSFont.systemFont(ofSize: 14, weight: .medium)
-        statusTitleLabel.frame = NSRect(x: 20, y: 180, width: 200, height: 20)
+        statusTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusTitleLabel.isEditable = false
+        statusTitleLabel.isBordered = false
+        statusTitleLabel.backgroundColor = NSColor.clear
         view.addSubview(statusTitleLabel)
+        self.statusTitleLabel = statusTitleLabel  // 保存引用
         
-        // 状态信息 - 紧跟标题下方
+        // 状态信息 - 使用Auto Layout
         statusLabel = NSTextField(labelWithString: "正在检查协议状态...")
         statusLabel.font = NSFont.systemFont(ofSize: 12)
         statusLabel.textColor = NSColor.secondaryLabelColor
-        statusLabel.frame = NSRect(x: 20, y: 160, width: 460, height: 16)
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.isEditable = false
+        statusLabel.isBordered = false
+        statusLabel.backgroundColor = NSColor.clear
         view.addSubview(statusLabel)
         
-        logger.info("✅ 状态区域设置完成 - 标题Y:\(statusTitleLabel.frame.origin.y), 状态Y:\(statusLabel.frame.origin.y)")
+        logger.info("✅ 状态区域设置完成")
+    }
+    
+    // MARK: - Flipped Container View
+    
+    /// 自定义的翻转坐标系统视图，确保子视图从顶部开始布局
+    private class FlippedContainerView: NSView {
+        override var isFlipped: Bool {
+            return true  // 翻转坐标系统，y=0在顶部
+        }
     }
     
     private func setupHandlersList() {
-        // 创建滚动视图 - 紧跟状态信息下方
-        scrollView = NSScrollView(frame: NSRect(x: 20, y: 60, width: 460, height: 90))
+        // 创建滚动视图 - 使用Auto Layout
+        scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.borderType = .bezelBorder
         scrollView.backgroundColor = NSColor.controlBackgroundColor
+        scrollView.autohidesScrollers = true  // macOS风格：自动隐藏滚动条
         
-        // 创建堆栈视图
-        handlersListView = NSStackView()
-        handlersListView.orientation = .vertical
-        handlersListView.alignment = .leading
-        handlersListView.spacing = 8
-        handlersListView.edgeInsets = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+        // 最终解决方案：使用flipped坐标系统的容器视图
+        let flippedContainer = FlippedContainerView()
+        flippedContainer.translatesAutoresizingMaskIntoConstraints = false
         
-        // 设置堆栈视图的约束
+        // 在flipped容器中创建普通NSView作为内容容器
+        handlersListView = NSView()
         handlersListView.translatesAutoresizingMaskIntoConstraints = false
+        handlersListView.wantsLayer = true
+        handlersListView.layer?.backgroundColor = NSColor.clear.cgColor
         
-        scrollView.documentView = handlersListView
+        flippedContainer.addSubview(handlersListView)
+        
+        // 设置handlersListView在flipped容器中的约束
+        NSLayoutConstraint.activate([
+            handlersListView.topAnchor.constraint(equalTo: flippedContainer.topAnchor),
+            handlersListView.leadingAnchor.constraint(equalTo: flippedContainer.leadingAnchor),
+            handlersListView.trailingAnchor.constraint(equalTo: flippedContainer.trailingAnchor),
+            handlersListView.bottomAnchor.constraint(equalTo: flippedContainer.bottomAnchor)
+        ])
+        
+        // 设置flipped容器为文档视图
+        scrollView.documentView = flippedContainer
         view.addSubview(scrollView)
         
-        logger.info("✅ 处理器列表视图已设置 - ScrollView Frame: \(scrollView.frame)")
+        logger.info("✅ 处理器列表视图已设置 - 使用flipped坐标系统确保从顶部到底部排列")
     }
     
     private func setupActionButtons() {
-        // 去掉操作标题，直接放置按钮在同一行
+        // 创建按钮容器视图
+        let buttonContainer = NSView()
+        buttonContainer.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(buttonContainer)
+        self.buttonContainer = buttonContainer  // 保存引用
         
         // 检查状态按钮
         checkStatusButton = NSButton(title: "检查协议状态", target: self, action: #selector(checkStatusButtonClicked))
         checkStatusButton.bezelStyle = .rounded
-        checkStatusButton.frame = NSRect(x: 20, y: 20, width: 120, height: 30)
-        view.addSubview(checkStatusButton)
+        checkStatusButton.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(checkStatusButton)
         
         // 重新注册按钮
         reregisterButton = NSButton(title: "重新注册协议", target: self, action: #selector(reregisterButtonClicked))
         reregisterButton.bezelStyle = .rounded
-        reregisterButton.frame = NSRect(x: 160, y: 20, width: 120, height: 30)
-        view.addSubview(reregisterButton)
+        reregisterButton.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(reregisterButton)
         
-        // 关闭按钮 - 移到右侧
+        // 关闭按钮
         closeButton = NSButton(title: "关闭", target: self, action: #selector(closeButtonClicked))
         closeButton.bezelStyle = .rounded
-        closeButton.frame = NSRect(x: 420, y: 20, width: 60, height: 30)
-        view.addSubview(closeButton)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(closeButton)
+        
+        logger.info("✅ 按钮区域设置完成")
     }
     
     private func setupProgressIndicator() {
@@ -124,9 +174,57 @@ public class JMSProtocolManagerViewController: NSViewController {
         progressIndicator.minValue = 0.0
         progressIndicator.maxValue = 1.0
         progressIndicator.doubleValue = 0.0
-        progressIndicator.frame = NSRect(x: 300, y: 30, width: 100, height: 6)
+        progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         progressIndicator.isHidden = true
         view.addSubview(progressIndicator)
+    }
+    
+    // MARK: - Auto Layout约束设置
+    private func setupConstraints() {
+        NSLayoutConstraint.activate([
+            // 状态标题 - 顶部对齐，左边距20
+            statusTitleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            statusTitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            statusTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
+            
+            // 状态信息 - 紧跟标题下方
+            statusLabel.topAnchor.constraint(equalTo: statusTitleLabel.bottomAnchor, constant: 4),
+            statusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
+            
+            // 滚动视图 - 占据中间大部分空间
+            scrollView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 12),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            scrollView.bottomAnchor.constraint(equalTo: buttonContainer.topAnchor, constant: -12),
+            
+            // 按钮容器 - 底部对齐
+            buttonContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            buttonContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            buttonContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+            buttonContainer.heightAnchor.constraint(equalToConstant: 32),
+            
+            // 按钮容器内的按钮布局
+            checkStatusButton.leadingAnchor.constraint(equalTo: buttonContainer.leadingAnchor),
+            checkStatusButton.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+            checkStatusButton.widthAnchor.constraint(equalToConstant: 120),
+            
+            reregisterButton.leadingAnchor.constraint(equalTo: checkStatusButton.trailingAnchor, constant: 12),
+            reregisterButton.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+            reregisterButton.widthAnchor.constraint(equalToConstant: 120),
+            
+            closeButton.trailingAnchor.constraint(equalTo: buttonContainer.trailingAnchor),
+            closeButton.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+            closeButton.widthAnchor.constraint(equalToConstant: 60),
+            
+            // 进度条 - 位于按钮右侧
+            progressIndicator.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -12),
+            progressIndicator.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+            progressIndicator.widthAnchor.constraint(equalToConstant: 120),
+            progressIndicator.heightAnchor.constraint(equalToConstant: 6)
+        ])
+        
+        logger.info("✅ Auto Layout约束设置完成")
     }
     
     // MARK: - 数据更新
@@ -137,11 +235,11 @@ public class JMSProtocolManagerViewController: NSViewController {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // 清空现有视图
-            self.handlersListView.arrangedSubviews.forEach { view in
-                self.handlersListView.removeArrangedSubview(view)
-                view.removeFromSuperview()
-            }
+            // 清空现有视图和约束
+            self.handlerViewConstraints.forEach { $0.isActive = false }
+            self.handlerViewConstraints.removeAll()
+            
+            self.handlersListView.subviews.forEach { $0.removeFromSuperview() }
             
             if self.handlers.isEmpty {
                 self.logger.warning("⚠️ 处理器列表为空，显示空状态")
@@ -150,36 +248,74 @@ public class JMSProtocolManagerViewController: NSViewController {
                 emptyLabel.textColor = NSColor.secondaryLabelColor
                 emptyLabel.alignment = .center
                 emptyLabel.translatesAutoresizingMaskIntoConstraints = false
+                emptyLabel.isEditable = false
+                emptyLabel.isBordered = false
+                emptyLabel.backgroundColor = NSColor.clear
                 
-                self.handlersListView.addArrangedSubview(emptyLabel)
+                self.handlersListView.addSubview(emptyLabel)
                 
-                // 设置约束确保标签居中显示
-                NSLayoutConstraint.activate([
-                    emptyLabel.widthAnchor.constraint(equalToConstant: 440),
-                    emptyLabel.heightAnchor.constraint(equalToConstant: 20)
-                ])
+                // 居中显示空状态标签
+                let constraints = [
+                    emptyLabel.centerXAnchor.constraint(equalTo: self.handlersListView.centerXAnchor),
+                    emptyLabel.topAnchor.constraint(equalTo: self.handlersListView.topAnchor, constant: 20),
+                    emptyLabel.leadingAnchor.constraint(greaterThanOrEqualTo: self.handlersListView.leadingAnchor, constant: 20),
+                    emptyLabel.trailingAnchor.constraint(lessThanOrEqualTo: self.handlersListView.trailingAnchor, constant: -20)
+                ]
+                NSLayoutConstraint.activate(constraints)
+                self.handlerViewConstraints.append(contentsOf: constraints)
                 
                 self.logger.info("📝 已显示空状态标签")
-                return
-            }
-            
-            // 添加处理器信息
-            for (index, handler) in self.handlers.enumerated() {
-                self.logger.info("📱 添加处理器 \(index + 1): \(handler.appName) at \(handler.appPath) (状态: \(handler.statusText))")
-                let handlerView = self.createHandlerView(for: handler)
-                self.handlersListView.addArrangedSubview(handlerView)
+            } else {
+                // 手动布局处理器视图 - 从顶部到底部排列
+                var previousView: NSView? = nil
+                let margin: CGFloat = 8
+                let spacing: CGFloat = 4
                 
-                // 设置视图约束
-                NSLayoutConstraint.activate([
-                    handlerView.widthAnchor.constraint(equalToConstant: 440),
-                    handlerView.heightAnchor.constraint(equalToConstant: 40)
-                ])
+                for (index, handler) in self.handlers.enumerated() {
+                    self.logger.info("📱 添加处理器 \(index + 1): \(handler.appName) at \(handler.appPath) (状态: \(handler.statusText))")
+                    let handlerView = self.createHandlerView(for: handler)
+                    
+                    self.handlersListView.addSubview(handlerView)
+                    
+                    // 手动设置约束 - 确保从顶部开始排列
+                    var constraints: [NSLayoutConstraint] = []
+                    
+                    if let previous = previousView {
+                        // 不是第一个视图，放在前一个视图下方
+                        constraints.append(handlerView.topAnchor.constraint(equalTo: previous.bottomAnchor, constant: spacing))
+                    } else {
+                        // 第一个视图，放在容器顶部
+                        constraints.append(handlerView.topAnchor.constraint(equalTo: self.handlersListView.topAnchor, constant: margin))
+                    }
+                    
+                    // 设置左右边距
+                    constraints.append(handlerView.leadingAnchor.constraint(equalTo: self.handlersListView.leadingAnchor, constant: margin))
+                    constraints.append(handlerView.trailingAnchor.constraint(equalTo: self.handlersListView.trailingAnchor, constant: -margin))
+                    
+                    NSLayoutConstraint.activate(constraints)
+                    self.handlerViewConstraints.append(contentsOf: constraints)
+                    
+                    previousView = handlerView
+                }
+                
+                // 设置最后一个视图到容器底部的约束（可选，用于确定容器高度）
+                if let lastView = previousView {
+                    let bottomConstraint = lastView.bottomAnchor.constraint(lessThanOrEqualTo: self.handlersListView.bottomAnchor, constant: -margin)
+                    bottomConstraint.priority = NSLayoutConstraint.Priority(999)  // 稍低优先级
+                    bottomConstraint.isActive = true
+                    self.handlerViewConstraints.append(bottomConstraint)
+                }
+                
+                self.logger.info("📐 已手动布局 \(self.handlers.count) 个处理器视图")
             }
             
             // 强制更新布局
             self.handlersListView.needsLayout = true
             self.handlersListView.layoutSubtreeIfNeeded()
             self.scrollView.needsDisplay = true
+            
+            // 滚动到顶部
+            self.scrollView.documentView?.scroll(NSPoint.zero)
             
             // 更新状态标签
             let currentAppCount = self.handlers.filter { $0.status == .currentApp }.count
@@ -190,7 +326,8 @@ public class JMSProtocolManagerViewController: NSViewController {
             self.statusLabel.stringValue = statusText
             self.logger.info("📊 状态更新: \(statusText)")
             
-            self.logger.info("✅ 界面更新完成，堆栈视图子视图数量: \(self.handlersListView.arrangedSubviews.count)")
+            self.logger.info("✅ 界面更新完成，手动布局子视图数量: \(self.handlersListView.subviews.count)")
+            self.logger.info("📐 列表项排列: 手动布局确保从顶部到底部排列")
             
             // 生成更新后的UI分析报告
             self.generateUIAnalysisReport(phase: "数据更新后")
@@ -206,6 +343,14 @@ public class JMSProtocolManagerViewController: NSViewController {
         containerView.layer?.cornerRadius = 4
         containerView.translatesAutoresizingMaskIntoConstraints = false
         
+        // 关键：设置容器视图的布局优先级，确保它在垂直方向上不会拉伸
+        containerView.setContentHuggingPriority(NSLayoutConstraint.Priority(1000), for: .vertical)  // 高优先级，不拉伸
+        containerView.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(1000), for: .vertical)  // 高优先级，不压缩
+        
+        // 水平方向上允许拉伸以填充宽度
+        containerView.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)  // 低优先级，允许拉伸
+        containerView.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(1000), for: .horizontal)  // 高优先级，不压缩
+        
         // 状态图标和应用名称
         var titleText = "\(handler.statusIcon) \(handler.appName) (\(handler.statusText))"
         if handler.isDefault {
@@ -219,6 +364,10 @@ public class JMSProtocolManagerViewController: NSViewController {
         titleLabel.backgroundColor = NSColor.clear
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
+        // 设置标题标签的布局优先级
+        titleLabel.setContentHuggingPriority(NSLayoutConstraint.Priority(1000), for: .vertical)
+        titleLabel.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(1000), for: .vertical)
+        
         // 应用路径
         let pathLabel = NSTextField(labelWithString: handler.appPath)
         pathLabel.font = NSFont.systemFont(ofSize: 10)
@@ -229,28 +378,35 @@ public class JMSProtocolManagerViewController: NSViewController {
         pathLabel.lineBreakMode = .byTruncatingMiddle
         pathLabel.translatesAutoresizingMaskIntoConstraints = false
         
+        // 设置路径标签的布局优先级
+        pathLabel.setContentHuggingPriority(NSLayoutConstraint.Priority(1000), for: .vertical)
+        pathLabel.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(1000), for: .vertical)
+        
         containerView.addSubview(titleLabel)
         containerView.addSubview(pathLabel)
         
-        // 使用Auto Layout约束
+        // 使用Auto Layout约束 - 确保固定高度和正确的内部布局
         NSLayoutConstraint.activate([
+            // 容器视图固定高度 - 关键：确保每个项目高度一致
+            containerView.heightAnchor.constraint(equalToConstant: 36),
+            
+            // 标题标签 - 顶部对齐，填充宽度
             titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 4),
             titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 8),
             titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -8),
-            titleLabel.heightAnchor.constraint(equalToConstant: 16),
             
+            // 路径标签 - 紧跟标题下方，填充宽度
             pathLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
             pathLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 8),
             pathLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -8),
-            pathLabel.heightAnchor.constraint(equalToConstant: 14),
-            pathLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -4)
+            pathLabel.bottomAnchor.constraint(lessThanOrEqualTo: containerView.bottomAnchor, constant: -4)
         ])
         
-        // 添加边框以便调试
+        // 添加边框
         containerView.layer?.borderWidth = 0.5
         containerView.layer?.borderColor = NSColor.separatorColor.cgColor
         
-        logger.debug("✅ 处理器视图创建完成: \(titleText)")
+        logger.debug("✅ 处理器视图创建完成: \(titleText) (固定高度36pt)")
         return containerView
     }
     
@@ -370,12 +526,12 @@ public class JMSProtocolManagerViewController: NSViewController {
         let reportTitle = "JMS协议管理界面分析 - \(phase)"
         let expectedLayout = """
         期望布局结构:
-        1. 顶部状态区域 (y: 160-200) - 协议状态标题和信息
-        2. 中间列表区域 (y: 60-150) - 协议处理器列表
+        1. 顶部状态区域 (y: 240-280) - 协议状态标题和信息
+        2. 中间列表区域 (y: 60-230) - 协议处理器列表
         3. 底部按钮区域 (y: 20-50) - 操作按钮
         
-        窗口尺寸: 520x220
-        主要组件: NSTextField(状态), NSScrollView(列表), NSStackView(内容), NSButton(操作)
+        窗口尺寸: 520x300
+        主要组件: NSTextField(状态), NSScrollView(列表), FlippedContainerView(内容), NSButton(操作)
         """
         
         let report = view.generateUIAnalysisReport(title: reportTitle, expectedLayout: expectedLayout)

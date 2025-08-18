@@ -34,7 +34,7 @@ DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
 
 ## 基本信息
 - 根视图类型: JMSProtocolManagerViewController
-- 根视图Frame: (0, 0, 520, 220)
+- 根视图Frame: (0, 0, 520, 300)
 - 总子视图数: 8
 - 最大层级深度: 3
 

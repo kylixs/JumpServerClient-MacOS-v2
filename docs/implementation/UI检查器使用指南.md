@@ -99,8 +99,8 @@ UILayoutDebugger.shared.startLayoutMonitoring(view, interval: 2.0)
 ### 视图层级结构
 ```
 📱 JMSProtocolManagerViewController
-    📐 Frame: (0, 0, 520, 220)
-    📏 Bounds: (0, 0, 520, 220)
+    📐 Frame: (0, 0, 520, 300)
+    📏 Bounds: (0, 0, 520, 300)
   📄 NSTextField
       📐 Frame: (20, 180, 200, 20)
       📏 Bounds: (0, 0, 200, 20)

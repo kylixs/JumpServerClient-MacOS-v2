@@ -1,6 +1,27 @@
 import Foundation
 import AppKit
 
+// MARK: - 坐标信息
+
+/// 坐标信息结构
+public struct CoordinateInfo {
+    /// 相对坐标（相对于父容器）
+    public let relativeFrame: NSRect
+    /// 绝对坐标（相对于窗口）
+    public let absoluteFrame: NSRect
+    /// 父容器Frame
+    public let parentFrame: NSRect?
+    /// 坐标转换是否成功
+    public let conversionSuccessful: Bool
+    
+    public init(relativeFrame: NSRect, absoluteFrame: NSRect, parentFrame: NSRect?, conversionSuccessful: Bool) {
+        self.relativeFrame = relativeFrame
+        self.absoluteFrame = absoluteFrame
+        self.parentFrame = parentFrame
+        self.conversionSuccessful = conversionSuccessful
+    }
+}
+
 // MARK: - UI分析报告主体
 
 /// UI分析报告
@@ -16,6 +37,7 @@ public class UIAnalysisReport {
     public var spaceUtilization: SpaceUtilizationAnalysis!
     public var constraintAnalysis: ConstraintAnalysis!
     public var improvementSuggestions: [ImprovementSuggestion] = []
+    public var coordinateAnalysis: CoordinateAnalysis!
     
     public init(title: String, version: Int, timestamp: Date, expectedLayout: String) {
         self.title = title
@@ -23,6 +45,56 @@ public class UIAnalysisReport {
         self.timestamp = timestamp
         self.expectedLayout = expectedLayout
     }
+}
+
+// MARK: - 坐标分析
+
+/// 坐标分析结果
+public class CoordinateAnalysis {
+    /// 坐标不一致的视图数量
+    public var inconsistentCoordinates: Int = 0
+    /// 超出父容器边界的视图数量
+    public var viewsOutOfParentBounds: Int = 0
+    /// 超出窗口边界的视图数量
+    public var viewsOutOfWindowBounds: Int = 0
+    /// 坐标转换失败的视图数量
+    public var coordinateConversionFailures: Int = 0
+    /// 详细的坐标问题列表
+    public var coordinateIssues: [CoordinateIssue] = []
+    
+    public init() {}
+}
+
+/// 坐标问题
+public struct CoordinateIssue {
+    public let viewPath: String
+    public let issueType: CoordinateIssueType
+    public let description: String
+    public let relativeFrame: NSRect
+    public let absoluteFrame: NSRect
+    public let parentFrame: NSRect?
+    public let suggestion: String
+    
+    public init(viewPath: String, issueType: CoordinateIssueType, description: String, 
+                relativeFrame: NSRect, absoluteFrame: NSRect, parentFrame: NSRect?, suggestion: String) {
+        self.viewPath = viewPath
+        self.issueType = issueType
+        self.description = description
+        self.relativeFrame = relativeFrame
+        self.absoluteFrame = absoluteFrame
+        self.parentFrame = parentFrame
+        self.suggestion = suggestion
+    }
+}
+
+/// 坐标问题类型
+public enum CoordinateIssueType: String, CaseIterable {
+    case outOfParentBounds = "OutOfParentBounds"
+    case outOfWindowBounds = "OutOfWindowBounds"
+    case coordinateInconsistency = "CoordinateInconsistency"
+    case conversionFailure = "ConversionFailure"
+    case negativeCoordinates = "NegativeCoordinates"
+    case unexpectedPosition = "UnexpectedPosition"
 }
 
 // MARK: - 基本信息
@@ -54,6 +126,10 @@ public class ViewHierarchyNode {
     public var usesAutoLayout: Bool = false
     public var specialProperties: [String: String] = [:]
     public var children: [ViewHierarchyNode] = []
+    
+    // 新增坐标信息
+    public var coordinateInfo: CoordinateInfo!
+    public var viewPath: String = ""
     
     public init() {}
 }
@@ -142,6 +218,7 @@ public enum SuggestionCategory: String, CaseIterable {
     case accessibility = "Accessibility"
     case architecture = "Architecture"
     case bugFix = "BugFix"
+    case coordinates = "Coordinates"
 }
 
 /// 建议优先级
@@ -206,6 +283,16 @@ public class ReportComparison {
             regressions.append("布局问题增加: \(beforeIssueCount) → \(afterIssueCount)")
         }
         
+        // 比较坐标问题
+        let beforeCoordIssues = beforeReport.coordinateAnalysis.coordinateIssues.count
+        let afterCoordIssues = afterReport.coordinateAnalysis.coordinateIssues.count
+        
+        if afterCoordIssues < beforeCoordIssues {
+            improvements.append("坐标问题减少: \(beforeCoordIssues) → \(afterCoordIssues)")
+        } else if afterCoordIssues > beforeCoordIssues {
+            regressions.append("坐标问题增加: \(beforeCoordIssues) → \(afterCoordIssues)")
+        }
+        
         // 分析具体问题变化
         let beforeIssueTypes = Set(beforeReport.layoutIssues.map { $0.type })
         let afterIssueTypes = Set(afterReport.layoutIssues.map { $0.type })
@@ -233,6 +320,7 @@ extension UIAnalysisReport {
         lines.append("📱 子视图总数: \(basicInfo.totalSubviews)")
         lines.append("🔍 布局问题: \(layoutIssues.count)个")
         lines.append("📈 空间利用率: \(Int(spaceUtilization.utilizationRatio * 100))%")
+        lines.append("📍 坐标问题: \(coordinateAnalysis.coordinateIssues.count)个")
         lines.append("💡 改进建议: \(improvementSuggestions.count)个")
         
         return lines.joined(separator: "\n")
@@ -246,6 +334,11 @@ extension UIAnalysisReport {
     /// 获取高优先级建议
     public var highPrioritySuggestions: [ImprovementSuggestion] {
         return improvementSuggestions.filter { $0.priority == .high }
+    }
+    
+    /// 获取坐标相关问题
+    public var coordinateIssues: [CoordinateIssue] {
+        return coordinateAnalysis.coordinateIssues
     }
 }
 
@@ -267,7 +360,27 @@ extension ViewHierarchyNode {
     
     /// 获取节点路径
     public func getPath() -> String {
-        // 这里需要从根节点开始构建路径，简化实现
-        return className
+        return viewPath.isEmpty ? className : viewPath
+    }
+}
+
+// MARK: - 坐标工具函数
+
+extension NSRect {
+    /// 格式化为字符串
+    public var formattedString: String {
+        return "(\(Int(origin.x)), \(Int(origin.y)), \(Int(size.width)), \(Int(size.height)))"
+    }
+    
+    /// 检查是否包含另一个矩形
+    public func fullyContains(_ rect: NSRect) -> Bool {
+        return self.contains(rect.origin) && 
+               self.contains(NSPoint(x: rect.maxX, y: rect.maxY))
+    }
+    
+    /// 计算与另一个矩形的重叠面积
+    public func overlapArea(with rect: NSRect) -> CGFloat {
+        let intersection = self.intersection(rect)
+        return intersection.width * intersection.height
     }
 }

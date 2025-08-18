@@ -47,6 +47,9 @@ public class UIInspector {
         // 约束分析
         report.constraintAnalysis = analyzeConstraints(view)
         
+        // 坐标分析
+        report.coordinateAnalysis = analyzeCoordinates(view)
+        
         // 生成改进建议
         report.improvementSuggestions = generateImprovementSuggestions(report)
         
@@ -80,15 +83,16 @@ public class UIInspector {
     /// - Parameter view: 根视图
     /// - Returns: 层级结构数据
     private func analyzeViewHierarchy(_ view: NSView) -> ViewHierarchyNode {
-        return buildHierarchyNode(view, level: 0)
+        return buildHierarchyNode(view, level: 0, parentPath: "")
     }
     
     /// 构建层级节点
     /// - Parameters:
     ///   - view: 当前视图
     ///   - level: 层级深度
+    ///   - parentPath: 父视图路径
     /// - Returns: 层级节点
-    private func buildHierarchyNode(_ view: NSView, level: Int) -> ViewHierarchyNode {
+    private func buildHierarchyNode(_ view: NSView, level: Int, parentPath: String = "") -> ViewHierarchyNode {
         let node = ViewHierarchyNode()
         
         node.className = String(describing: type(of: view))
@@ -99,6 +103,12 @@ public class UIInspector {
         node.level = level
         node.hasConstraints = !view.constraints.isEmpty
         node.usesAutoLayout = !view.translatesAutoresizingMaskIntoConstraints
+        
+        // 构建视图路径
+        node.viewPath = parentPath.isEmpty ? node.className : "\(parentPath) -> \(node.className)"
+        
+        // 计算坐标信息
+        node.coordinateInfo = calculateCoordinateInfo(for: view)
         
         // 收集特殊属性
         if let textField = view as? NSTextField {
@@ -128,7 +138,7 @@ public class UIInspector {
         
         // 递归处理子视图
         for subview in view.subviews {
-            node.children.append(buildHierarchyNode(subview, level: level + 1))
+            node.children.append(buildHierarchyNode(subview, level: level + 1, parentPath: node.viewPath))
         }
         
         return node
@@ -344,6 +354,156 @@ public class UIInspector {
         return analysis
     }
     
+    /// 计算视图的坐标信息
+    /// - Parameter view: 要分析的视图
+    /// - Returns: 坐标信息
+    private func calculateCoordinateInfo(for view: NSView) -> CoordinateInfo {
+        let relativeFrame = view.frame
+        var absoluteFrame = relativeFrame
+        var parentFrame: NSRect? = nil
+        var conversionSuccessful = true
+        
+        // 获取父视图信息
+        if let superview = view.superview {
+            parentFrame = superview.frame
+            
+            // 尝试转换到窗口坐标系
+            if let window = view.window {
+                let convertedOrigin = superview.convert(relativeFrame.origin, to: nil)
+                absoluteFrame = NSRect(origin: convertedOrigin, size: relativeFrame.size)
+            } else {
+                // 如果没有窗口，计算相对于根视图的坐标
+                var currentView = view
+                var accumulatedOrigin = relativeFrame.origin
+                
+                while let parent = currentView.superview {
+                    accumulatedOrigin.x += parent.frame.origin.x
+                    accumulatedOrigin.y += parent.frame.origin.y
+                    currentView = parent
+                }
+                
+                absoluteFrame = NSRect(origin: accumulatedOrigin, size: relativeFrame.size)
+                conversionSuccessful = false
+            }
+        }
+        
+        return CoordinateInfo(
+            relativeFrame: relativeFrame,
+            absoluteFrame: absoluteFrame,
+            parentFrame: parentFrame,
+            conversionSuccessful: conversionSuccessful
+        )
+    }
+    
+    /// 分析坐标问题
+    /// - Parameter view: 根视图
+    /// - Returns: 坐标分析结果
+    private func analyzeCoordinates(_ view: NSView) -> CoordinateAnalysis {
+        let analysis = CoordinateAnalysis()
+        
+        analyzeViewCoordinates(view, analysis: analysis, parentPath: "")
+        
+        return analysis
+    }
+    
+    /// 递归分析视图坐标
+    /// - Parameters:
+    ///   - view: 当前视图
+    ///   - analysis: 分析结果
+    ///   - parentPath: 父视图路径
+    private func analyzeViewCoordinates(_ view: NSView, analysis: CoordinateAnalysis, parentPath: String) {
+        let className = String(describing: type(of: view))
+        let currentPath = parentPath.isEmpty ? className : "\(parentPath) -> \(className)"
+        let coordInfo = calculateCoordinateInfo(for: view)
+        
+        // 检查坐标转换失败
+        if !coordInfo.conversionSuccessful {
+            analysis.coordinateConversionFailures += 1
+            analysis.coordinateIssues.append(CoordinateIssue(
+                viewPath: currentPath,
+                issueType: .conversionFailure,
+                description: "坐标转换失败，无法获取准确的窗口坐标",
+                relativeFrame: coordInfo.relativeFrame,
+                absoluteFrame: coordInfo.absoluteFrame,
+                parentFrame: coordInfo.parentFrame,
+                suggestion: "检查视图是否正确添加到窗口层级中"
+            ))
+        }
+        
+        // 检查负坐标
+        if coordInfo.relativeFrame.origin.x < 0 || coordInfo.relativeFrame.origin.y < 0 {
+            analysis.coordinateIssues.append(CoordinateIssue(
+                viewPath: currentPath,
+                issueType: .negativeCoordinates,
+                description: "视图使用负坐标: \(coordInfo.relativeFrame.formattedString)",
+                relativeFrame: coordInfo.relativeFrame,
+                absoluteFrame: coordInfo.absoluteFrame,
+                parentFrame: coordInfo.parentFrame,
+                suggestion: "检查视图位置设置，负坐标可能导致显示问题"
+            ))
+        }
+        
+        // 检查是否超出父容器边界
+        if let parentFrame = coordInfo.parentFrame {
+            let parentBounds = NSRect(origin: .zero, size: parentFrame.size)
+            if !parentBounds.fullyContains(coordInfo.relativeFrame) {
+                analysis.viewsOutOfParentBounds += 1
+                analysis.coordinateIssues.append(CoordinateIssue(
+                    viewPath: currentPath,
+                    issueType: .outOfParentBounds,
+                    description: "视图超出父容器边界",
+                    relativeFrame: coordInfo.relativeFrame,
+                    absoluteFrame: coordInfo.absoluteFrame,
+                    parentFrame: coordInfo.parentFrame,
+                    suggestion: "调整视图位置或父容器尺寸，确保子视图完全在父容器内"
+                ))
+            }
+        }
+        
+        // 检查是否超出窗口边界
+        if let window = view.window {
+            let windowBounds = NSRect(origin: .zero, size: window.frame.size)
+            if !windowBounds.fullyContains(coordInfo.absoluteFrame) {
+                analysis.viewsOutOfWindowBounds += 1
+                analysis.coordinateIssues.append(CoordinateIssue(
+                    viewPath: currentPath,
+                    issueType: .outOfWindowBounds,
+                    description: "视图超出窗口边界",
+                    relativeFrame: coordInfo.relativeFrame,
+                    absoluteFrame: coordInfo.absoluteFrame,
+                    parentFrame: coordInfo.parentFrame,
+                    suggestion: "调整视图位置或窗口尺寸，确保视图完全在窗口内"
+                ))
+            }
+        }
+        
+        // 检查坐标一致性（相对坐标和绝对坐标的逻辑关系）
+        if let parentFrame = coordInfo.parentFrame {
+            let expectedAbsoluteX = parentFrame.origin.x + coordInfo.relativeFrame.origin.x
+            let expectedAbsoluteY = parentFrame.origin.y + coordInfo.relativeFrame.origin.y
+            let tolerance: CGFloat = 1.0 // 允许1像素的误差
+            
+            if abs(coordInfo.absoluteFrame.origin.x - expectedAbsoluteX) > tolerance ||
+               abs(coordInfo.absoluteFrame.origin.y - expectedAbsoluteY) > tolerance {
+                analysis.inconsistentCoordinates += 1
+                analysis.coordinateIssues.append(CoordinateIssue(
+                    viewPath: currentPath,
+                    issueType: .coordinateInconsistency,
+                    description: "相对坐标和绝对坐标不一致",
+                    relativeFrame: coordInfo.relativeFrame,
+                    absoluteFrame: coordInfo.absoluteFrame,
+                    parentFrame: coordInfo.parentFrame,
+                    suggestion: "检查视图层级结构和坐标转换逻辑"
+                ))
+            }
+        }
+        
+        // 递归检查子视图
+        for subview in view.subviews {
+            analyzeViewCoordinates(subview, analysis: analysis, parentPath: currentPath)
+        }
+    }
+    
     /// 生成改进建议
     /// - Parameter report: 分析报告
     /// - Returns: 改进建议列表
@@ -391,6 +551,59 @@ public class UIInspector {
                     "确保布局在不同屏幕尺寸下的适应性"
                 ]
             ))
+        }
+        
+        // 基于坐标分析的建议
+        let coordIssues = report.coordinateAnalysis.coordinateIssues
+        if !coordIssues.isEmpty {
+            let outOfBoundsCount = coordIssues.filter { $0.issueType == .outOfParentBounds || $0.issueType == .outOfWindowBounds }.count
+            let inconsistentCount = coordIssues.filter { $0.issueType == .coordinateInconsistency }.count
+            let negativeCount = coordIssues.filter { $0.issueType == .negativeCoordinates }.count
+            
+            if outOfBoundsCount > 0 {
+                suggestions.append(ImprovementSuggestion(
+                    category: .coordinates,
+                    priority: .high,
+                    title: "修复视图边界问题",
+                    description: "发现\(outOfBoundsCount)个视图超出边界",
+                    actionItems: [
+                        "检查视图的frame设置，确保在父容器范围内",
+                        "调整父容器尺寸以容纳所有子视图",
+                        "使用Auto Layout约束避免硬编码位置",
+                        "验证窗口尺寸是否足够容纳所有内容"
+                    ]
+                ))
+            }
+            
+            if inconsistentCount > 0 {
+                suggestions.append(ImprovementSuggestion(
+                    category: .coordinates,
+                    priority: .medium,
+                    title: "修复坐标一致性问题",
+                    description: "发现\(inconsistentCount)个坐标不一致问题",
+                    actionItems: [
+                        "检查视图层级结构是否正确",
+                        "验证坐标转换逻辑",
+                        "确保视图正确添加到父容器中",
+                        "使用Auto Layout避免手动坐标计算"
+                    ]
+                ))
+            }
+            
+            if negativeCount > 0 {
+                suggestions.append(ImprovementSuggestion(
+                    category: .coordinates,
+                    priority: .medium,
+                    title: "修复负坐标问题",
+                    description: "发现\(negativeCount)个视图使用负坐标",
+                    actionItems: [
+                        "检查视图位置设置，避免使用负坐标",
+                        "调整布局逻辑，确保所有视图位置为正值",
+                        "考虑调整父容器的bounds或origin",
+                        "使用Auto Layout的leading/trailing约束替代x坐标"
+                    ]
+                ))
+            }
         }
         
         return suggestions
@@ -473,6 +686,31 @@ public class UIInspector {
         lines.append("- 建议: \(report.constraintAnalysis.recommendation)")
         lines.append("")
         
+        // 坐标分析
+        lines.append("## 坐标分析")
+        lines.append("- 坐标不一致: \(report.coordinateAnalysis.inconsistentCoordinates)个")
+        lines.append("- 超出父容器边界: \(report.coordinateAnalysis.viewsOutOfParentBounds)个")
+        lines.append("- 超出窗口边界: \(report.coordinateAnalysis.viewsOutOfWindowBounds)个")
+        lines.append("- 坐标转换失败: \(report.coordinateAnalysis.coordinateConversionFailures)个")
+        lines.append("")
+        
+        // 坐标问题详情
+        if !report.coordinateAnalysis.coordinateIssues.isEmpty {
+            lines.append("## 坐标问题详情 (\(report.coordinateAnalysis.coordinateIssues.count)个)")
+            for issue in report.coordinateAnalysis.coordinateIssues {
+                let typeIcon = getCoordinateIssueIcon(issue.issueType)
+                lines.append("\(typeIcon) [\(issue.issueType.rawValue)] \(issue.description)")
+                lines.append("   路径: \(issue.viewPath)")
+                lines.append("   相对坐标: \(issue.relativeFrame.formattedString)")
+                lines.append("   绝对坐标: \(issue.absoluteFrame.formattedString)")
+                if let parentFrame = issue.parentFrame {
+                    lines.append("   父容器: \(parentFrame.formattedString)")
+                }
+                lines.append("   建议: \(issue.suggestion)")
+                lines.append("")
+            }
+        }
+        
         // 改进建议
         lines.append("## 改进建议 (\(report.improvementSuggestions.count)个)")
         for suggestion in report.improvementSuggestions {
@@ -508,7 +746,18 @@ public class UIInspector {
         if node.alpha < 1.0 { info += " [α=\(String(format: "%.2f", node.alpha))]" }
         
         lines.append(info)
-        lines.append("\(indent)    📐 Frame: \(formatRect(node.frame))")
+        lines.append("\(indent)    📐 相对Frame: \(formatRect(node.frame))")
+        
+        // 添加坐标信息
+        if let coordInfo = node.coordinateInfo {
+            lines.append("\(indent)    🌍 绝对Frame: \(coordInfo.absoluteFrame.formattedString)")
+            if let parentFrame = coordInfo.parentFrame {
+                lines.append("\(indent)    👆 父容器Frame: \(parentFrame.formattedString)")
+            }
+            if !coordInfo.conversionSuccessful {
+                lines.append("\(indent)    ⚠️ 坐标转换失败")
+            }
+        }
         
         // 添加特殊属性
         for (key, value) in node.specialProperties {
@@ -521,6 +770,26 @@ public class UIInspector {
         }
         
         return lines.joined(separator: "\n")
+    }
+    
+    /// 获取坐标问题图标
+    /// - Parameter issueType: 问题类型
+    /// - Returns: 对应的图标
+    private func getCoordinateIssueIcon(_ issueType: CoordinateIssueType) -> String {
+        switch issueType {
+        case .outOfParentBounds:
+            return "🔴"
+        case .outOfWindowBounds:
+            return "🟠"
+        case .coordinateInconsistency:
+            return "🟡"
+        case .conversionFailure:
+            return "🔵"
+        case .negativeCoordinates:
+            return "🟣"
+        case .unexpectedPosition:
+            return "⚫"
+        }
     }
     
     // MARK: - 辅助方法
