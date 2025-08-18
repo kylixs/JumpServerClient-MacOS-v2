@@ -92,6 +92,9 @@ public class ProtocolDetectionService: @unchecked Sendable {
                 }
                 
                 do {
+                    // 刷新Launch Services缓存以获取最新的协议处理器信息
+                    try self.refreshLaunchServicesCache()
+                    
                     let handlers = try self.scanProtocolHandlers()
                     DispatchQueue.main.async {
                         continuation.resume(returning: handlers)
@@ -102,6 +105,40 @@ public class ProtocolDetectionService: @unchecked Sendable {
                     }
                 }
             }
+        }
+    }
+    
+    /// 刷新Launch Services缓存
+    /// - Throws: ProtocolDetectionError
+    private func refreshLaunchServicesCache() throws {
+        logger.info("🔄 刷新Launch Services缓存...")
+        
+        let task = Process()
+        task.launchPath = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+        task.arguments = ["-kill", "-r", "-domain", "local", "-domain", "user"]
+        
+        let pipe = Pipe()
+        task.standardError = pipe
+        
+        do {
+            try task.run()
+            task.waitUntilExit()
+            
+            if task.terminationStatus != 0 {
+                let errorData = pipe.fileHandleForReading.readDataToEndOfFile()
+                let errorMessage = String(data: errorData, encoding: .utf8) ?? "未知错误"
+                logger.warning("⚠️ Launch Services缓存刷新警告: \(errorMessage)")
+                // 不抛出错误，因为这个操作失败不应该阻止检测
+            } else {
+                logger.info("✅ Launch Services缓存刷新成功")
+            }
+            
+            // 等待一小段时间让系统更新缓存
+            Thread.sleep(forTimeInterval: 0.5)
+            
+        } catch {
+            logger.warning("⚠️ Launch Services缓存刷新失败: \(error)")
+            // 不抛出错误，继续执行检测
         }
     }
     

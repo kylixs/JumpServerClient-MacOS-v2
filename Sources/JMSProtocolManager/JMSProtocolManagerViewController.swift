@@ -412,6 +412,12 @@ public class JMSProtocolManagerViewController: NSViewController {
     
     // MARK: - 按钮事件
     @objc private func checkStatusButtonClicked() {
+        logger.info("🔘 用户点击检查协议状态按钮")
+        
+        // 清空当前数据，强制重新检测
+        handlers.removeAll()
+        updateHandlersList()
+        
         checkProtocolStatus()
     }
     
@@ -434,16 +440,26 @@ public class JMSProtocolManagerViewController: NSViewController {
         Task {
             do {
                 logger.info("📡 调用协议检测服务...")
+                
+                // 强制刷新检测服务的缓存
                 let detectedHandlers = try await detectionService.detectAllHandlers()
                 logger.info("✅ 检测完成，获得 \(detectedHandlers.count) 个处理器")
                 
                 await MainActor.run {
                     logger.info("🔄 在主线程更新UI...")
+                    
+                    // 强制清空旧数据
+                    self.handlers.removeAll()
+                    
+                    // 设置新数据
                     self.handlers = detectedHandlers
+                    
+                    // 强制更新UI
                     self.updateHandlersList()
                     self.setUIEnabled(true)
+                    
                     self.delegate?.protocolCheckDidComplete(handlers: detectedHandlers)
-                    logger.info("✅ UI更新完成")
+                    logger.info("✅ UI更新完成，当前显示 \(self.handlers.count) 个处理器")
                 }
             } catch {
                 logger.error("❌ 协议检测失败: \(error)")
@@ -492,9 +508,14 @@ public class JMSProtocolManagerViewController: NSViewController {
                     self.setUIEnabled(true)
                     
                     if success {
-                        self.statusLabel.stringValue = "协议注册成功"
-                        self.logger.info("✅ 协议注册成功")
-                        self.checkProtocolStatus() // 重新检查状态
+                        self.statusLabel.stringValue = "协议注册成功，正在刷新状态..."
+                        self.logger.info("✅ 协议注册成功，准备刷新状态")
+                        
+                        // 延迟一下再检查状态，确保系统完全更新
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.logger.info("🔄 延迟后重新检查协议状态...")
+                            self.checkProtocolStatus()
+                        }
                     } else {
                         self.statusLabel.stringValue = "协议注册失败"
                         self.logger.error("❌ 协议注册失败")
