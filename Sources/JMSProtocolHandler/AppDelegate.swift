@@ -3,6 +3,7 @@ import Cocoa
 import JMSCore
 import JMSRDPModule
 import JMSSSHModule
+import JMSProtocolManager
 
 /// 应用程序委托
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -12,10 +13,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var rdpSettingsWindow: NSWindow?
     private var rdpSettingsViewController: RDPSettingsViewController?
     
+    // JMS协议管理组件
+    private var protocolManagerWindow: NSWindow?
+    private var protocolManagerViewController: JMSProtocolManagerViewController?
+    
     // 菜单项引用，用于动态更新文字
     private var statusBarRDPSettingsItem: NSMenuItem?
     private var appMenuRDPSettingsItem: NSMenuItem?
     private var rdpSubMenuSettingsItem: NSMenuItem?
+    
+    // JMS协议管理菜单项引用
+    private var statusBarProtocolManagerItem: NSMenuItem?
+    private var appMenuProtocolManagerItem: NSMenuItem?
     
     // URL处理标志
     private var hasProcessedURL = false
@@ -129,6 +138,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("🔚 应用退出，清理RDP设置窗口资源")
             cleanupRDPSettingsWindow()
         }
+        
+        // 清理JMS协议管理窗口资源
+        if protocolManagerWindow != nil || protocolManagerViewController != nil {
+            print("🔚 应用退出，清理JMS协议管理窗口资源")
+            cleanupProtocolManagerWindow()
+        }
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -153,6 +168,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarRDPSettingsItem = NSMenuItem(title: "显示RDP设置", action: #selector(showRDPSettings), keyEquivalent: ",")
         statusBarRDPSettingsItem?.target = self
         menu.addItem(statusBarRDPSettingsItem!)
+        
+        // JMS协议管理菜单项
+        statusBarProtocolManagerItem = NSMenuItem(title: "JMS协议管理...", action: #selector(showProtocolManager), keyEquivalent: "")
+        statusBarProtocolManagerItem?.target = self
+        menu.addItem(statusBarProtocolManagerItem!)
         
         // RDP质量配置子菜单
         let qualityMenuItem = NSMenuItem(title: "快速切换质量", action: nil, keyEquivalent: "")
@@ -208,6 +228,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appMenuRDPSettingsItem = NSMenuItem(title: "显示RDP设置", action: #selector(showRDPSettings), keyEquivalent: ",")
         appMenuRDPSettingsItem?.target = self
         appMenu.addItem(appMenuRDPSettingsItem!)
+        
+        // JMS协议管理菜单项
+        appMenuProtocolManagerItem = NSMenuItem(title: "JMS协议管理...", action: #selector(showProtocolManager), keyEquivalent: "")
+        appMenuProtocolManagerItem?.target = self
+        appMenu.addItem(appMenuProtocolManagerItem!)
         
         appMenu.addItem(NSMenuItem.separator())
         
@@ -341,6 +366,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateRDPSettingsMenuItems()
     }
     
+    @objc private func showProtocolManager() {
+        // 如果窗口不存在，创建它
+        if protocolManagerWindow == nil {
+            createProtocolManagerWindow()
+        }
+        
+        // 显示窗口
+        protocolManagerWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        print("📱 显示JMS协议管理窗口")
+    }
+    
     private func createRDPSettingsWindow() {
         print("🏗️ 创建RDP设置窗口")
         
@@ -365,6 +403,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rdpSettingsWindow?.delegate = self
         
         print("✅ RDP设置窗口创建完成")
+    }
+    
+    private func createProtocolManagerWindow() {
+        print("🏗️ 创建JMS协议管理窗口")
+        
+        // 创建JMS协议管理视图控制器
+        protocolManagerViewController = JMSProtocolManagerViewController()
+        protocolManagerViewController?.delegate = self
+        
+        // 创建JMS协议管理窗口
+        let windowRect = NSRect(x: 0, y: 0, width: 420, height: 280)
+        protocolManagerWindow = NSWindow(
+            contentRect: windowRect,
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        protocolManagerWindow?.title = "JMS协议管理"
+        protocolManagerWindow?.center()
+        protocolManagerWindow?.contentViewController = protocolManagerViewController
+        
+        // 设置窗口关闭时的行为
+        protocolManagerWindow?.delegate = self
+        
+        print("✅ JMS协议管理窗口创建完成")
     }
     
     private func updateRDPSettingsMenuItems() {
@@ -396,6 +460,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         print("🧹 RDP设置窗口组件清理完成")
+    }
+    
+    private func cleanupProtocolManagerWindow() {
+        print("🧹 开始清理JMS协议管理窗口组件")
+        
+        // 安全地清理视图控制器
+        if protocolManagerViewController != nil {
+            protocolManagerViewController?.delegate = nil
+            protocolManagerViewController = nil
+        }
+        
+        // 安全地清理窗口
+        if protocolManagerWindow != nil {
+            protocolManagerWindow?.delegate = nil
+            protocolManagerWindow?.close()
+            protocolManagerWindow = nil
+        }
+        
+        print("🧹 JMS协议管理窗口组件清理完成")
     }
     
     private func cleanupRDPSettingsWindowReferences() {
@@ -770,6 +853,11 @@ extension AppDelegate: NSWindowDelegate {
             // 更新菜单文字
             updateRDPSettingsMenuItems()
             return false  // 阻止真正的关闭
+        } else if sender == protocolManagerWindow {
+            print("📱 JMS协议管理窗口请求关闭，隐藏窗口而不释放资源")
+            // 隐藏窗口而不是真正关闭
+            sender.orderOut(nil)
+            return false  // 阻止真正的关闭
         }
         return true
     }
@@ -777,14 +865,83 @@ extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         if notification.object as? NSWindow == rdpSettingsWindow {
             print("📱 RDP设置窗口即将关闭")
+        } else if notification.object as? NSWindow == protocolManagerWindow {
+            print("📱 JMS协议管理窗口即将关闭")
         }
     }
     
-    func windowDidClose(_ notification: Notification) {
+    private func windowDidClose(_ notification: Notification) {
         if notification.object as? NSWindow == rdpSettingsWindow {
             print("📱 RDP设置窗口已关闭")
             // 不再清理引用，保持资源可用
             // cleanupRDPSettingsWindowReferences()
+        } else if notification.object as? NSWindow == protocolManagerWindow {
+            print("📱 JMS协议管理窗口已关闭")
+            // 不再清理引用，保持资源可用
         }
+    }
+}
+
+// MARK: - ProtocolManagerDelegate
+
+extension AppDelegate: ProtocolManagerDelegate {
+    
+    func protocolCheckDidStart() {
+        print("🔍 JMS协议状态检查开始")
+    }
+    
+    func protocolCheckDidComplete(handlers: [ProtocolHandlerModel]) {
+        print("✅ JMS协议状态检查完成，找到 \(handlers.count) 个处理器")
+        
+        // 显示通知
+        let currentAppCount = handlers.filter { $0.status == .currentApp }.count
+        let otherAppCount = handlers.filter { $0.status == .otherApp }.count
+        
+        if currentAppCount > 0 {
+            showNotification(
+                title: "协议状态检查完成",
+                message: "当前应用已注册为jms://协议处理器"
+            )
+        } else if otherAppCount > 0 {
+            showNotification(
+                title: "协议冲突检测",
+                message: "发现其他应用注册了jms://协议，建议重新注册"
+            )
+        }
+    }
+    
+    func protocolCheckDidFail(error: Error) {
+        print("❌ JMS协议状态检查失败: \(error.localizedDescription)")
+        showAlert("协议检查失败", message: error.localizedDescription)
+    }
+    
+    func protocolRegistrationDidStart() {
+        print("🔧 JMS协议注册开始")
+        showNotification(
+            title: "协议注册",
+            message: "正在重新注册jms://协议处理器..."
+        )
+    }
+    
+    func protocolRegistrationDidProgress(message: String, progress: Double) {
+        print("📊 JMS协议注册进度: \(message) (\(Int(progress * 100))%)")
+    }
+    
+    func protocolRegistrationDidComplete(success: Bool) {
+        print(success ? "✅ JMS协议注册成功" : "❌ JMS协议注册失败")
+        
+        if success {
+            showNotification(
+                title: "协议注册成功",
+                message: "jms://协议已成功注册到当前应用"
+            )
+        } else {
+            showAlert("协议注册失败", message: "无法完成协议注册，请检查系统权限")
+        }
+    }
+    
+    func protocolRegistrationDidFail(error: Error) {
+        print("❌ JMS协议注册失败: \(error.localizedDescription)")
+        showAlert("协议注册失败", message: error.localizedDescription)
     }
 }

@@ -29,6 +29,11 @@ let package = Package(
         .library(
             name: "JMSSSHModule", 
             targets: ["JMSSSHModule"]
+        ),
+        // JMS协议管理模块
+        .library(
+            name: "JMSProtocolManager",
+            targets: ["JMSProtocolManager"]
         )
     ],
     dependencies: [
@@ -41,7 +46,8 @@ let package = Package(
             dependencies: [
                 "JMSCore",
                 "JMSRDPModule", 
-                "JMSSSHModule"
+                "JMSSSHModule",
+                "JMSProtocolManager"
             ],
             path: "Sources/JMSProtocolHandler",
             exclude: [
@@ -72,6 +78,13 @@ let package = Package(
             name: "JMSSSHModule", 
             dependencies: ["JMSCore"],
             path: "Sources/JMSSSHModule"
+        ),
+        
+        // JMS协议管理模块 - 协议检测和注册功能
+        .target(
+            name: "JMSProtocolManager",
+            dependencies: [],
+            path: "Sources/JMSProtocolManager"
         ),
         
         // 测试目标
