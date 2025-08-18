@@ -49,7 +49,7 @@ public class JMSProtocolManagerViewController: NSViewController {
             self.generateUIAnalysisReport(phase: "初始加载")
         }
         
-        checkProtocolStatus()
+        checkProtocolStatus(forceRefresh: false) // 初始加载使用快速模式
     }
     
     // MARK: - UI设置
@@ -412,13 +412,13 @@ public class JMSProtocolManagerViewController: NSViewController {
     
     // MARK: - 按钮事件
     @objc private func checkStatusButtonClicked() {
-        logger.info("🔘 用户点击检查协议状态按钮")
+        logger.info("🔘 用户点击检查协议状态按钮 - 使用强制刷新模式")
         
         // 清空当前数据，强制重新检测
         handlers.removeAll()
         updateHandlersList()
         
-        checkProtocolStatus()
+        checkProtocolStatus(forceRefresh: true)
     }
     
     @objc private func reregisterButtonClicked() {
@@ -430,8 +430,8 @@ public class JMSProtocolManagerViewController: NSViewController {
     }
     
     // MARK: - 协议操作
-    private func checkProtocolStatus() {
-        logger.info("🔍 开始检查协议状态...")
+    private func checkProtocolStatus(forceRefresh: Bool = false) {
+        logger.info("🔍 开始检查协议状态... (强制刷新: \(forceRefresh))")
         setUIEnabled(false)
         statusLabel.stringValue = "正在检查协议状态..."
         
@@ -441,8 +441,8 @@ public class JMSProtocolManagerViewController: NSViewController {
             do {
                 logger.info("📡 调用协议检测服务...")
                 
-                // 强制刷新检测服务的缓存
-                let detectedHandlers = try await detectionService.detectAllHandlers()
+                // 根据参数决定是否强制刷新缓存
+                let detectedHandlers = try await detectionService.detectAllHandlers(forceRefresh: forceRefresh)
                 logger.info("✅ 检测完成，获得 \(detectedHandlers.count) 个处理器")
                 
                 await MainActor.run {
@@ -511,10 +511,10 @@ public class JMSProtocolManagerViewController: NSViewController {
                         self.statusLabel.stringValue = "协议注册成功，正在刷新状态..."
                         self.logger.info("✅ 协议注册成功，准备刷新状态")
                         
-                        // 延迟一下再检查状态，确保系统完全更新
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            self.logger.info("🔄 延迟后重新检查协议状态...")
-                            self.checkProtocolStatus()
+                        // 减少延迟时间，现代系统更新很快
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            self.logger.info("🔄 快速检查协议状态...")
+                            self.checkProtocolStatus(forceRefresh: false) // 重新注册后不需要强制刷新
                         }
                     } else {
                         self.statusLabel.stringValue = "协议注册失败"
@@ -617,7 +617,7 @@ public class JMSProtocolManagerViewController: NSViewController {
                     if success {
                         self.statusLabel.stringValue = "协议注册成功（使用管理员权限）"
                         self.logger.info("✅ 协议注册成功（使用管理员权限）")
-                        self.checkProtocolStatus() // 重新检查状态
+                        self.checkProtocolStatus(forceRefresh: false) // 重新检查状态，使用快速模式
                     } else {
                         self.statusLabel.stringValue = "协议注册失败"
                         self.logger.error("❌ 协议注册失败（即使使用管理员权限）")

@@ -79,9 +79,10 @@ public class ProtocolDetectionService: @unchecked Sendable {
     }
     
     /// 检测所有协议处理器
+    /// - Parameter forceRefresh: 是否强制刷新缓存
     /// - Returns: 协议处理器列表
     /// - Throws: ProtocolDetectionError
-    public func detectAllHandlers() async throws -> [ProtocolHandlerModel] {
+    public func detectAllHandlers(forceRefresh: Bool = false) async throws -> [ProtocolHandlerModel] {
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else {
@@ -92,8 +93,10 @@ public class ProtocolDetectionService: @unchecked Sendable {
                 }
                 
                 do {
-                    // 刷新Launch Services缓存以获取最新的协议处理器信息
-                    try self.refreshLaunchServicesCache()
+                    // 只在强制刷新时才刷新Launch Services缓存
+                    if forceRefresh {
+                        try self.refreshLaunchServicesCache()
+                    }
                     
                     let handlers = try self.scanProtocolHandlers()
                     DispatchQueue.main.async {
@@ -133,8 +136,8 @@ public class ProtocolDetectionService: @unchecked Sendable {
                 logger.info("✅ Launch Services缓存刷新成功")
             }
             
-            // 等待一小段时间让系统更新缓存
-            Thread.sleep(forTimeInterval: 0.5)
+            // 减少等待时间，现代macOS系统更新很快
+            Thread.sleep(forTimeInterval: 0.1)
             
         } catch {
             logger.warning("⚠️ Launch Services缓存刷新失败: \(error)")
