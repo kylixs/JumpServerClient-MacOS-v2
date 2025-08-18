@@ -1,5 +1,6 @@
 import Cocoa
 import Foundation
+import JMSCore
 
 /// JMS协议管理视图控制器
 public class JMSProtocolManagerViewController: NSViewController {
@@ -16,6 +17,7 @@ public class JMSProtocolManagerViewController: NSViewController {
     // MARK: - 服务
     private let detectionService = ProtocolDetectionService.shared
     private let registrationService = ProtocolRegistrationService.shared
+    private let logger = LogManager.shared
     
     // MARK: - 数据
     private var handlers: [ProtocolHandlerModel] = []
@@ -40,27 +42,27 @@ public class JMSProtocolManagerViewController: NSViewController {
         setupActionButtons()
         setupProgressIndicator()
         
-        print("✅ JMS协议管理视图已加载")
+        logger.info("✅ JMS协议管理视图已加载")
     }
     
     private func setupStatusSection() {
-        // 状态标题
+        // 状态标题 - 向上移动
         let statusTitleLabel = NSTextField(labelWithString: "📡 协议状态")
         statusTitleLabel.font = NSFont.systemFont(ofSize: 14, weight: .medium)
-        statusTitleLabel.frame = NSRect(x: 20, y: 240, width: 200, height: 20)
+        statusTitleLabel.frame = NSRect(x: 20, y: 190, width: 200, height: 20)
         view.addSubview(statusTitleLabel)
         
-        // 状态信息
+        // 状态信息 - 向上移动
         statusLabel = NSTextField(labelWithString: "正在检查协议状态...")
         statusLabel.font = NSFont.systemFont(ofSize: 12)
         statusLabel.textColor = NSColor.secondaryLabelColor
-        statusLabel.frame = NSRect(x: 20, y: 220, width: 360, height: 16)
+        statusLabel.frame = NSRect(x: 20, y: 170, width: 460, height: 16)
         view.addSubview(statusLabel)
     }
     
     private func setupHandlersList() {
-        // 创建滚动视图
-        scrollView = NSScrollView(frame: NSRect(x: 20, y: 120, width: 360, height: 90))
+        // 创建滚动视图 - 向上移动，增加高度
+        scrollView = NSScrollView(frame: NSRect(x: 20, y: 70, width: 460, height: 90))
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.borderType = .bezelBorder
@@ -73,33 +75,34 @@ public class JMSProtocolManagerViewController: NSViewController {
         handlersListView.spacing = 8
         handlersListView.edgeInsets = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
         
+        // 设置堆栈视图的约束
+        handlersListView.translatesAutoresizingMaskIntoConstraints = false
+        
         scrollView.documentView = handlersListView
         view.addSubview(scrollView)
+        
+        logger.info("✅ 处理器列表视图已设置")
     }
     
     private func setupActionButtons() {
-        // 操作标题
-        let actionTitleLabel = NSTextField(labelWithString: "🔧 协议操作")
-        actionTitleLabel.font = NSFont.systemFont(ofSize: 14, weight: .medium)
-        actionTitleLabel.frame = NSRect(x: 20, y: 90, width: 200, height: 20)
-        view.addSubview(actionTitleLabel)
+        // 去掉操作标题，直接放置按钮在同一行
         
         // 检查状态按钮
         checkStatusButton = NSButton(title: "检查协议状态", target: self, action: #selector(checkStatusButtonClicked))
         checkStatusButton.bezelStyle = .rounded
-        checkStatusButton.frame = NSRect(x: 20, y: 50, width: 120, height: 30)
+        checkStatusButton.frame = NSRect(x: 20, y: 20, width: 120, height: 30)
         view.addSubview(checkStatusButton)
         
         // 重新注册按钮
         reregisterButton = NSButton(title: "重新注册协议", target: self, action: #selector(reregisterButtonClicked))
         reregisterButton.bezelStyle = .rounded
-        reregisterButton.frame = NSRect(x: 160, y: 50, width: 120, height: 30)
+        reregisterButton.frame = NSRect(x: 160, y: 20, width: 120, height: 30)
         view.addSubview(reregisterButton)
         
-        // 关闭按钮
+        // 关闭按钮 - 移到右侧
         closeButton = NSButton(title: "关闭", target: self, action: #selector(closeButtonClicked))
         closeButton.bezelStyle = .rounded
-        closeButton.frame = NSRect(x: 320, y: 20, width: 60, height: 30)
+        closeButton.frame = NSRect(x: 420, y: 20, width: 60, height: 30)
         view.addSubview(closeButton)
     }
     
@@ -110,52 +113,97 @@ public class JMSProtocolManagerViewController: NSViewController {
         progressIndicator.minValue = 0.0
         progressIndicator.maxValue = 1.0
         progressIndicator.doubleValue = 0.0
-        progressIndicator.frame = NSRect(x: 20, y: 20, width: 280, height: 6)
+        progressIndicator.frame = NSRect(x: 300, y: 30, width: 100, height: 6)
         progressIndicator.isHidden = true
         view.addSubview(progressIndicator)
     }
     
     // MARK: - 数据更新
     private func updateHandlersList() {
-        // 清空现有视图
-        handlersListView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        logger.info("🔄 更新处理器列表，共有 \(handlers.count) 个处理器")
         
-        if handlers.isEmpty {
-            let emptyLabel = NSTextField(labelWithString: "未找到任何jms://协议处理器")
-            emptyLabel.font = NSFont.systemFont(ofSize: 12)
-            emptyLabel.textColor = NSColor.secondaryLabelColor
-            emptyLabel.alignment = .center
-            handlersListView.addArrangedSubview(emptyLabel)
-            return
+        // 确保在主线程执行UI更新
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // 清空现有视图
+            self.handlersListView.arrangedSubviews.forEach { view in
+                self.handlersListView.removeArrangedSubview(view)
+                view.removeFromSuperview()
+            }
+            
+            if self.handlers.isEmpty {
+                self.logger.warning("⚠️ 处理器列表为空，显示空状态")
+                let emptyLabel = NSTextField(labelWithString: "未找到任何jms://协议处理器")
+                emptyLabel.font = NSFont.systemFont(ofSize: 12)
+                emptyLabel.textColor = NSColor.secondaryLabelColor
+                emptyLabel.alignment = .center
+                emptyLabel.translatesAutoresizingMaskIntoConstraints = false
+                
+                self.handlersListView.addArrangedSubview(emptyLabel)
+                
+                // 设置约束确保标签居中显示
+                NSLayoutConstraint.activate([
+                    emptyLabel.widthAnchor.constraint(equalToConstant: 440),
+                    emptyLabel.heightAnchor.constraint(equalToConstant: 20)
+                ])
+                
+                self.logger.info("📝 已显示空状态标签")
+                return
+            }
+            
+            // 添加处理器信息
+            for (index, handler) in self.handlers.enumerated() {
+                self.logger.info("📱 添加处理器 \(index + 1): \(handler.appName) at \(handler.appPath) (状态: \(handler.statusText))")
+                let handlerView = self.createHandlerView(for: handler)
+                self.handlersListView.addArrangedSubview(handlerView)
+                
+                // 设置视图约束
+                NSLayoutConstraint.activate([
+                    handlerView.widthAnchor.constraint(equalToConstant: 440),
+                    handlerView.heightAnchor.constraint(equalToConstant: 40)
+                ])
+            }
+            
+            // 强制更新布局
+            self.handlersListView.needsLayout = true
+            self.handlersListView.layoutSubtreeIfNeeded()
+            self.scrollView.needsDisplay = true
+            
+            // 更新状态标签
+            let currentAppCount = self.handlers.filter { $0.status == .currentApp }.count
+            let otherAppCount = self.handlers.filter { $0.status == .otherApp }.count
+            let invalidCount = self.handlers.filter { $0.status == .invalid }.count
+            
+            let statusText = "jms://协议处理器 (共\(self.handlers.count)个): 当前应用\(currentAppCount)个, 其他应用\(otherAppCount)个, 无效\(invalidCount)个"
+            self.statusLabel.stringValue = statusText
+            self.logger.info("📊 状态更新: \(statusText)")
+            
+            self.logger.info("✅ 界面更新完成，堆栈视图子视图数量: \(self.handlersListView.arrangedSubviews.count)")
         }
-        
-        // 添加处理器信息
-        for handler in handlers {
-            let handlerView = createHandlerView(for: handler)
-            handlersListView.addArrangedSubview(handlerView)
-        }
-        
-        // 更新状态标签
-        let currentAppCount = handlers.filter { $0.status == .currentApp }.count
-        let otherAppCount = handlers.filter { $0.status == .otherApp }.count
-        let invalidCount = handlers.filter { $0.status == .invalid }.count
-        
-        statusLabel.stringValue = "jms://协议处理器 (共\(handlers.count)个): 当前应用\(currentAppCount)个, 其他应用\(otherAppCount)个, 无效\(invalidCount)个"
     }
     
     private func createHandlerView(for handler: ProtocolHandlerModel) -> NSView {
+        logger.debug("🎨 创建处理器视图: \(handler.appName)")
+        
         let containerView = NSView()
         containerView.wantsLayer = true
         containerView.layer?.backgroundColor = NSColor.controlColor.cgColor
         containerView.layer?.cornerRadius = 4
+        containerView.translatesAutoresizingMaskIntoConstraints = false
         
         // 状态图标和应用名称
-        let titleLabel = NSTextField(labelWithString: "\(handler.statusIcon) \(handler.appName) (\(handler.statusText))")
+        var titleText = "\(handler.statusIcon) \(handler.appName) (\(handler.statusText))"
+        if handler.isDefault {
+            titleText += " [默认]"
+        }
+        
+        let titleLabel = NSTextField(labelWithString: titleText)
         titleLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         titleLabel.isBezeled = false
         titleLabel.isEditable = false
         titleLabel.backgroundColor = NSColor.clear
-        titleLabel.frame = NSRect(x: 8, y: 20, width: 320, height: 16)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         // 应用路径
         let pathLabel = NSTextField(labelWithString: handler.appPath)
@@ -165,14 +213,30 @@ public class JMSProtocolManagerViewController: NSViewController {
         pathLabel.isEditable = false
         pathLabel.backgroundColor = NSColor.clear
         pathLabel.lineBreakMode = .byTruncatingMiddle
-        pathLabel.frame = NSRect(x: 8, y: 4, width: 320, height: 14)
+        pathLabel.translatesAutoresizingMaskIntoConstraints = false
         
         containerView.addSubview(titleLabel)
         containerView.addSubview(pathLabel)
         
-        // 设置容器视图大小
-        containerView.frame = NSRect(x: 0, y: 0, width: 340, height: 40)
+        // 使用Auto Layout约束
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 4),
+            titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 8),
+            titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -8),
+            titleLabel.heightAnchor.constraint(equalToConstant: 16),
+            
+            pathLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            pathLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 8),
+            pathLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -8),
+            pathLabel.heightAnchor.constraint(equalToConstant: 14),
+            pathLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -4)
+        ])
         
+        // 添加边框以便调试
+        containerView.layer?.borderWidth = 0.5
+        containerView.layer?.borderColor = NSColor.separatorColor.cgColor
+        
+        logger.debug("✅ 处理器视图创建完成: \(titleText)")
         return containerView
     }
     
@@ -191,6 +255,7 @@ public class JMSProtocolManagerViewController: NSViewController {
     
     // MARK: - 协议操作
     private func checkProtocolStatus() {
+        logger.info("🔍 开始检查协议状态...")
         setUIEnabled(false)
         statusLabel.stringValue = "正在检查协议状态..."
         
@@ -198,15 +263,20 @@ public class JMSProtocolManagerViewController: NSViewController {
         
         Task {
             do {
+                logger.info("📡 调用协议检测服务...")
                 let detectedHandlers = try await detectionService.detectAllHandlers()
+                logger.info("✅ 检测完成，获得 \(detectedHandlers.count) 个处理器")
                 
                 await MainActor.run {
+                    logger.info("🔄 在主线程更新UI...")
                     self.handlers = detectedHandlers
                     self.updateHandlersList()
                     self.setUIEnabled(true)
                     self.delegate?.protocolCheckDidComplete(handlers: detectedHandlers)
+                    logger.info("✅ UI更新完成")
                 }
             } catch {
+                logger.error("❌ 协议检测失败: \(error)")
                 await MainActor.run {
                     self.statusLabel.stringValue = "协议状态检查失败: \(error.localizedDescription)"
                     self.setUIEnabled(true)
@@ -228,6 +298,7 @@ public class JMSProtocolManagerViewController: NSViewController {
         let response = alert.runModal()
         guard response == .alertFirstButtonReturn else { return }
         
+        logger.info("🔄 开始重新注册协议...")
         setUIEnabled(false)
         progressIndicator.isHidden = false
         progressIndicator.doubleValue = 0.0
@@ -241,6 +312,7 @@ public class JMSProtocolManagerViewController: NSViewController {
                         self?.statusLabel.stringValue = message
                         self?.progressIndicator.doubleValue = progress
                         self?.delegate?.protocolRegistrationDidProgress(message: message, progress: progress)
+                        self?.logger.info("📊 注册进度: \(message) (\(Int(progress * 100))%)")
                     }
                 }
                 
@@ -250,14 +322,17 @@ public class JMSProtocolManagerViewController: NSViewController {
                     
                     if success {
                         self.statusLabel.stringValue = "协议注册成功"
+                        self.logger.info("✅ 协议注册成功")
                         self.checkProtocolStatus() // 重新检查状态
                     } else {
                         self.statusLabel.stringValue = "协议注册失败"
+                        self.logger.error("❌ 协议注册失败")
                     }
                     
                     self.delegate?.protocolRegistrationDidComplete(success: success)
                 }
             } catch {
+                logger.error("❌ 协议注册异常: \(error)")
                 await MainActor.run {
                     self.progressIndicator.isHidden = true
                     self.statusLabel.stringValue = "协议注册失败: \(error.localizedDescription)"

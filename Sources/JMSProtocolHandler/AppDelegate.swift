@@ -412,8 +412,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         protocolManagerViewController = JMSProtocolManagerViewController()
         protocolManagerViewController?.delegate = self
         
-        // 创建JMS协议管理窗口
-        let windowRect = NSRect(x: 0, y: 0, width: 420, height: 280)
+        // 创建JMS协议管理窗口 - 调整尺寸：加宽，缩短高度
+        let windowRect = NSRect(x: 0, y: 0, width: 520, height: 220)
         protocolManagerWindow = NSWindow(
             contentRect: windowRect,
             styleMask: [.titled, .closable, .resizable, .miniaturizable],

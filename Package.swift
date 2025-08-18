@@ -83,7 +83,7 @@ let package = Package(
         // JMS协议管理模块 - 协议检测和注册功能
         .target(
             name: "JMSProtocolManager",
-            dependencies: [],
+            dependencies: ["JMSCore"],
             path: "Sources/JMSProtocolManager"
         ),
         

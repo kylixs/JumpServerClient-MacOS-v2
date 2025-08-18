@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import JMSCore
 
 /// 协议检测服务错误类型
 public enum ProtocolDetectionError: Error, LocalizedError {
@@ -31,6 +32,9 @@ public class ProtocolDetectionService: @unchecked Sendable {
     /// 当前应用的Bundle标识符
     private let currentBundleId: String
     
+    /// 日志管理器
+    private let logger = LogManager.shared
+    
     private init() {
         // 先初始化Bundle ID
         self.currentBundleId = Bundle.main.bundleIdentifier ?? "com.jumpserver.JMSProtocolHandler"
@@ -47,36 +51,34 @@ public class ProtocolDetectionService: @unchecked Sendable {
             self.currentAppPath = Self.findJMSProtocolHandlerPath() ?? bundlePath
         }
         
-        print("🔍 ProtocolDetectionService初始化:")
-        print("   Bundle路径: \(bundlePath)")
-        print("   当前应用路径: \(currentAppPath)")
-        print("   Bundle ID: \(currentBundleId)")
+        logger.info("🔍 ProtocolDetectionService初始化:")
+        logger.info("   Bundle路径: \(bundlePath)")
+        logger.info("   当前应用路径: \(currentAppPath)")
+        logger.info("   Bundle ID: \(currentBundleId)")
     }
     
-    /// 查找JMSProtocolHandler.app的可能路径
-    /// - Returns: JMSProtocolHandler.app的路径，如果找不到则返回nil
+    /// 查找JMSProtocolHandler应用路径
+    /// - Returns: 找到的路径或nil
     private static func findJMSProtocolHandlerPath() -> String? {
         let possiblePaths = [
             "/Applications/JMSProtocolHandler.app",
             NSHomeDirectory() + "/Applications/JMSProtocolHandler.app",
-            // 构建输出目录
-            Bundle.main.bundlePath.replacingOccurrences(of: "/usr/bin", with: "") + "/build/Release/JMSProtocolHandler.app",
-            // 项目根目录的构建输出
-            Bundle.main.bundlePath.components(separatedBy: "/").dropLast(4).joined(separator: "/") + "/build/Release/JMSProtocolHandler.app"
+            // 添加构建输出路径
+            FileManager.default.currentDirectoryPath + "/build/Release/JMSProtocolHandler.app"
         ]
         
         for path in possiblePaths {
             if FileManager.default.fileExists(atPath: path) {
-                print("✅ 找到JMSProtocolHandler.app: \(path)")
+                LogManager.shared.info("✅ 找到JMSProtocolHandler.app: \(path)")
                 return path
             }
         }
         
-        print("⚠️ 未找到JMSProtocolHandler.app，使用Bundle路径")
+        LogManager.shared.warning("⚠️ 未找到JMSProtocolHandler.app在常见位置")
         return nil
     }
     
-    /// 检测所有已注册的jms://协议处理器
+    /// 检测所有协议处理器
     /// - Returns: 协议处理器列表
     /// - Throws: ProtocolDetectionError
     public func detectAllHandlers() async throws -> [ProtocolHandlerModel] {
@@ -115,6 +117,7 @@ public class ProtocolDetectionService: @unchecked Sendable {
     private func getDefaultHandler() -> ProtocolHandlerModel? {
         let workspace = NSWorkspace.shared
         guard let url = workspace.urlForApplication(toOpen: URL(string: "jms://test")!) else {
+            logger.warning("⚠️ 无法获取jms://协议的默认处理器")
             return nil
         }
         
@@ -122,6 +125,8 @@ public class ProtocolDetectionService: @unchecked Sendable {
         let appName = url.lastPathComponent.replacingOccurrences(of: ".app", with: "")
         
         let status: ProtocolHandlerStatus = (appPath == currentAppPath) ? .currentApp : .otherApp
+        
+        logger.info("✅ 系统默认处理器: \(appName) at \(appPath)")
         
         return ProtocolHandlerModel(
             appName: appName,
@@ -137,20 +142,22 @@ public class ProtocolDetectionService: @unchecked Sendable {
     private func scanProtocolHandlers() throws -> [ProtocolHandlerModel] {
         var handlers: [ProtocolHandlerModel] = []
         
-        print("🔍 开始扫描JMS协议处理器...")
+        logger.info("🔍 开始扫描JMS协议处理器...")
         
         // 方法1: 获取系统默认处理器（这是macOS系统决定的，我们不干预）
         if let defaultHandler = getDefaultHandler() {
             handlers.append(defaultHandler)
-            print("✅ 系统默认处理器: \(defaultHandler.appName) at \(defaultHandler.appPath)")
+            logger.info("✅ 系统默认处理器: \(defaultHandler.appName) at \(defaultHandler.appPath)")
         } else {
-            print("⚠️ 系统中未注册jms://协议的默认处理器")
+            logger.warning("⚠️ 系统中未注册jms://协议的默认处理器")
         }
         
         // 方法2: 扫描系统中所有可能的JMSProtocolHandler应用（仅用于信息展示）
         let knownPaths = [
             "/Applications/JMSProtocolHandler.app",
-            NSHomeDirectory() + "/Applications/JMSProtocolHandler.app"
+            NSHomeDirectory() + "/Applications/JMSProtocolHandler.app",
+            // 添加构建输出路径
+            FileManager.default.currentDirectoryPath + "/build/Release/JMSProtocolHandler.app"
         ]
         
         for path in knownPaths {
@@ -167,7 +174,7 @@ public class ProtocolDetectionService: @unchecked Sendable {
                 // 避免重复添加
                 if !handlers.contains(where: { $0.appPath == path }) {
                     handlers.append(handler)
-                    print("✅ 发现JMSProtocolHandler应用: \(appName) at \(path)")
+                    logger.info("✅ 发现JMSProtocolHandler应用: \(appName) at \(path)")
                 }
             }
         }
@@ -178,17 +185,27 @@ public class ProtocolDetectionService: @unchecked Sendable {
         // 合并处理器列表，去重
         let allHandlers = (handlers + additionalHandlers).uniqued()
         
-        // 如果没有找到任何处理器，返回空列表
-        if allHandlers.isEmpty {
-            print("⚠️ 未找到任何jms://协议处理器")
-            return []
-        }
-        
+        // 验证所有处理器
         let validatedHandlers = allHandlers.map { handler in
             validateHandler(handler)
         }
         
-        print("📊 扫描完成，共找到 \(validatedHandlers.count) 个处理器")
+        logger.info("📊 扫描完成，共找到 \(validatedHandlers.count) 个处理器")
+        
+        // 详细记录每个处理器
+        for (index, handler) in validatedHandlers.enumerated() {
+            logger.info("📱 处理器 \(index + 1): \(handler.appName)")
+            logger.info("   路径: \(handler.appPath)")
+            logger.info("   状态: \(handler.statusText)")
+            logger.info("   默认: \(handler.isDefault ? "是" : "否")")
+            logger.info("   有效: \(handler.status != .invalid ? "是" : "否")")
+        }
+        
+        // 即使没有找到处理器，也返回列表（可能为空）
+        if validatedHandlers.isEmpty {
+            logger.warning("⚠️ 未找到任何有效的jms://协议处理器")
+        }
+        
         return validatedHandlers
     }
     
@@ -217,7 +234,7 @@ public class ProtocolDetectionService: @unchecked Sendable {
             }
         } catch {
             // 如果命令失败，不抛出错误，只是返回空列表
-            print("⚠️ 无法通过Launch Services获取处理器信息: \(error)")
+            logger.warning("⚠️ 无法通过Launch Services获取处理器信息: \(error)")
         }
         
         return handlers
@@ -237,7 +254,7 @@ public class ProtocolDetectionService: @unchecked Sendable {
             
             // 查找包含jms协议的条目
             if trimmedLine.contains("jms") || trimmedLine.contains("JMS") {
-                print("🔍 发现jms相关条目: \(trimmedLine)")
+                logger.debug("🔍 发现jms相关条目: \(trimmedLine)")
                 
                 // 尝试提取应用路径信息
                 if trimmedLine.contains(".app") {
@@ -258,7 +275,7 @@ public class ProtocolDetectionService: @unchecked Sendable {
                             )
                             
                             handlers.append(handler)
-                            print("✅ 从Launch Services解析到处理器: \(appName) at \(appPath)")
+                            logger.info("✅ 从Launch Services解析到处理器: \(appName) at \(appPath)")
                             break
                         }
                     }
@@ -296,11 +313,11 @@ public class ProtocolDetectionService: @unchecked Sendable {
             registrationDate: handler.registrationDate
         )
         
-        print("🔍 验证处理器: \(handler.appName)")
-        print("   路径: \(handler.appPath)")
-        print("   有效: \(isValid)")
-        print("   状态: \(status)")
-        print("   当前应用路径: \(currentAppPath)")
+        logger.debug("🔍 验证处理器: \(handler.appName)")
+        logger.debug("   路径: \(handler.appPath)")
+        logger.debug("   有效: \(isValid)")
+        logger.debug("   状态: \(status)")
+        logger.debug("   当前应用路径: \(currentAppPath)")
         
         return validatedHandler
     }
