@@ -7,6 +7,7 @@ public enum ProtocolRegistrationError: Error, LocalizedError {
     case registrationFailed(String)
     case cleanupFailed(String)
     case permissionDenied
+    case userCancelled
     case systemError(String)
     
     public var errorDescription: String? {
@@ -19,6 +20,8 @@ public enum ProtocolRegistrationError: Error, LocalizedError {
             return "协议清理失败: \(message)"
         case .permissionDenied:
             return "权限不足，无法注册协议"
+        case .userCancelled:
+            return "用户取消了权限授权"
         case .systemError(let message):
             return "系统错误: \(message)"
         }
@@ -97,11 +100,19 @@ public class ProtocolRegistrationService: @unchecked Sendable {
     /// 清理现有的协议注册
     /// - Throws: ProtocolRegistrationError
     private func cleanupExistingRegistrations() throws {
-        // 方法1: 使用lsregister清理
-        try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
-                      arguments: ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"])
+        do {
+            // 首先尝试普通权限清理
+            try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
+                          arguments: ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"])
+        } catch ProtocolRegistrationError.permissionDenied {
+            // 如果权限不足，尝试使用管理员权限
+            print("⚠️ 普通权限清理失败，尝试使用管理员权限...")
+            try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
+                          arguments: ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"],
+                          requiresElevation: true)
+        }
         
-        // 方法2: 清理Launch Services数据库中的jms协议条目
+        // 清理Launch Services数据库中的jms协议条目
         try cleanupLaunchServicesDatabase()
     }
     
@@ -156,9 +167,17 @@ public class ProtocolRegistrationService: @unchecked Sendable {
     /// 使用系统API注册
     /// - Throws: ProtocolRegistrationError
     private func registerUsingSystemAPI() throws {
-        // 使用lsregister注册当前应用
-        try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
-                      arguments: ["-f", currentAppPath])
+        do {
+            // 首先尝试普通权限注册
+            try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
+                          arguments: ["-f", currentAppPath])
+        } catch ProtocolRegistrationError.permissionDenied {
+            // 如果权限不足，尝试使用管理员权限
+            print("⚠️ 普通权限注册失败，尝试使用管理员权限...")
+            try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
+                          arguments: ["-f", currentAppPath],
+                          requiresElevation: true)
+        }
         
         // 设置为默认处理器 - 兼容不同macOS版本
         if #available(macOS 12.0, *) {
@@ -191,7 +210,22 @@ public class ProtocolRegistrationService: @unchecked Sendable {
     ///   - command: 命令路径
     ///   - arguments: 命令参数
     /// - Throws: ProtocolRegistrationError
-    private func runCommand(_ command: String, arguments: [String]) throws {
+    /// 运行命令，支持权限提升
+    /// - Parameters:
+    ///   - command: 命令路径
+    ///   - arguments: 命令参数
+    ///   - requiresElevation: 是否需要管理员权限
+    /// - Throws: ProtocolRegistrationError
+    private func runCommand(_ command: String, arguments: [String], requiresElevation: Bool = false) throws {
+        if requiresElevation {
+            try runCommandWithElevation(command, arguments: arguments)
+        } else {
+            try runCommandNormally(command, arguments: arguments)
+        }
+    }
+    
+    /// 正常运行命令
+    private func runCommandNormally(_ command: String, arguments: [String]) throws {
         let task = Process()
         task.launchPath = command
         task.arguments = arguments
@@ -209,7 +243,8 @@ public class ProtocolRegistrationService: @unchecked Sendable {
                 let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                 let errorMessage = String(data: errorData, encoding: .utf8) ?? "未知错误"
                 
-                if errorMessage.contains("permission") || errorMessage.contains("Permission") {
+                if errorMessage.contains("permission") || errorMessage.contains("Permission") || 
+                   errorMessage.contains("Operation not permitted") {
                     throw ProtocolRegistrationError.permissionDenied
                 } else {
                     throw ProtocolRegistrationError.systemError("命令执行失败: \(errorMessage)")
@@ -227,6 +262,34 @@ public class ProtocolRegistrationService: @unchecked Sendable {
         } catch {
             throw ProtocolRegistrationError.systemError("命令执行异常: \(error.localizedDescription)")
         }
+    }
+    
+    /// 使用管理员权限运行命令（macOS风格）
+    private func runCommandWithElevation(_ command: String, arguments: [String]) throws {
+        // 创建AppleScript来请求管理员权限
+        let script = """
+        do shell script "\(command) \(arguments.joined(separator: " "))" with administrator privileges
+        """
+        
+        let appleScript = NSAppleScript(source: script)
+        var errorDict: NSDictionary?
+        
+        let result = appleScript?.executeAndReturnError(&errorDict)
+        
+        if let error = errorDict {
+            let errorMessage = error["NSAppleScriptErrorMessage"] as? String ?? "未知错误"
+            if errorMessage.contains("User canceled") || errorMessage.contains("用户取消") {
+                throw ProtocolRegistrationError.userCancelled
+            } else {
+                throw ProtocolRegistrationError.systemError("权限提升失败: \(errorMessage)")
+            }
+        }
+        
+        if result == nil {
+            throw ProtocolRegistrationError.systemError("命令执行失败")
+        }
+        
+        print("✅ 管理员权限命令执行成功")
     }
     
     /// 检查注册脚本是否存在

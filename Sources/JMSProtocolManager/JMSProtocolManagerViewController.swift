@@ -505,11 +505,139 @@ public class JMSProtocolManagerViewController: NSViewController {
                 logger.error("❌ 协议注册异常: \(error)")
                 await MainActor.run {
                     self.progressIndicator.isHidden = true
-                    self.statusLabel.stringValue = "协议注册失败: \(error.localizedDescription)"
                     self.setUIEnabled(true)
+                    
+                    // 根据错误类型提供不同的处理
+                    if let registrationError = error as? ProtocolRegistrationError {
+                        switch registrationError {
+                        case .permissionDenied:
+                            self.showPermissionDeniedAlert()
+                        case .userCancelled:
+                            self.statusLabel.stringValue = "用户取消了权限授权"
+                            self.logger.info("ℹ️ 用户取消了权限授权")
+                        default:
+                            self.statusLabel.stringValue = "协议注册失败: \(error.localizedDescription)"
+                        }
+                    } else {
+                        self.statusLabel.stringValue = "协议注册失败: \(error.localizedDescription)"
+                    }
+                    
                     self.delegate?.protocolRegistrationDidFail(error: error)
                 }
             }
+        }
+    }
+    
+    /// 显示权限不足的提示对话框
+    private func showPermissionDeniedAlert() {
+        let alert = NSAlert()
+        alert.messageText = "权限不足"
+        alert.informativeText = """
+        注册jms://协议需要管理员权限来修改系统设置。
+        
+        请选择以下操作：
+        • 点击"使用管理员权限"重试（推荐）
+        • 点击"手动注册"查看手动操作步骤
+        • 点击"取消"放弃注册
+        """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "使用管理员权限")
+        alert.addButton(withTitle: "手动注册")
+        alert.addButton(withTitle: "取消")
+        
+        let response = alert.runModal()
+        
+        switch response {
+        case .alertFirstButtonReturn:
+            // 用户选择使用管理员权限重试
+            logger.info("🔐 用户选择使用管理员权限重试")
+            reregisterProtocolWithElevation()
+        case .alertSecondButtonReturn:
+            // 用户选择查看手动注册步骤
+            logger.info("📖 用户选择查看手动注册步骤")
+            showManualRegistrationGuide()
+        default:
+            // 用户取消
+            logger.info("❌ 用户取消了权限提升")
+            statusLabel.stringValue = "协议注册已取消"
+        }
+    }
+    
+    /// 使用管理员权限重新注册协议
+    private func reregisterProtocolWithElevation() {
+        logger.info("🔐 开始使用管理员权限重新注册协议...")
+        setUIEnabled(false)
+        progressIndicator.isHidden = false
+        progressIndicator.doubleValue = 0.0
+        statusLabel.stringValue = "正在请求管理员权限..."
+        
+        Task {
+            do {
+                let success = try await registrationService.reregisterProtocol { [weak self] message, progress in
+                    DispatchQueue.main.async {
+                        self?.statusLabel.stringValue = message
+                        self?.progressIndicator.doubleValue = progress
+                        self?.delegate?.protocolRegistrationDidProgress(message: message, progress: progress)
+                        self?.logger.info("📊 注册进度: \(message) (\(Int(progress * 100))%)")
+                    }
+                }
+                
+                await MainActor.run {
+                    self.progressIndicator.isHidden = true
+                    self.setUIEnabled(true)
+                    
+                    if success {
+                        self.statusLabel.stringValue = "协议注册成功（使用管理员权限）"
+                        self.logger.info("✅ 协议注册成功（使用管理员权限）")
+                        self.checkProtocolStatus() // 重新检查状态
+                    } else {
+                        self.statusLabel.stringValue = "协议注册失败"
+                        self.logger.error("❌ 协议注册失败（即使使用管理员权限）")
+                    }
+                    
+                    self.delegate?.protocolRegistrationDidComplete(success: success)
+                }
+            } catch {
+                logger.error("❌ 管理员权限注册异常: \(error)")
+                await MainActor.run {
+                    self.progressIndicator.isHidden = true
+                    self.setUIEnabled(true)
+                    self.statusLabel.stringValue = "管理员权限注册失败: \(error.localizedDescription)"
+                    self.delegate?.protocolRegistrationDidFail(error: error)
+                }
+            }
+        }
+    }
+    
+    /// 显示手动注册指南
+    private func showManualRegistrationGuide() {
+        let alert = NSAlert()
+        alert.messageText = "手动注册jms://协议"
+        alert.informativeText = """
+        如果自动注册失败，您可以手动执行以下步骤：
+        
+        1. 打开"终端"应用程序
+        2. 执行以下命令：
+           sudo /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "\(Bundle.main.bundlePath)"
+        3. 输入管理员密码
+        4. 重启应用程序
+        
+        或者运行项目中的注册脚本：
+        ./scripts/deployment/register_jms_protocol.sh
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "复制命令")
+        alert.addButton(withTitle: "关闭")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // 复制命令到剪贴板
+            let command = "sudo /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f \"\(Bundle.main.bundlePath)\""
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+            
+            statusLabel.stringValue = "命令已复制到剪贴板"
+            logger.info("📋 手动注册命令已复制到剪贴板")
         }
     }
     
