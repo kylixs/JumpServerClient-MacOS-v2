@@ -34,6 +34,11 @@ let package = Package(
         .library(
             name: "JMSProtocolManager",
             targets: ["JMSProtocolManager"]
+        ),
+        // UI检查器模块
+        .library(
+            name: "UIInspector",
+            targets: ["UIInspector"]
         )
     ],
     dependencies: [
@@ -47,7 +52,8 @@ let package = Package(
                 "JMSCore",
                 "JMSRDPModule", 
                 "JMSSSHModule",
-                "JMSProtocolManager"
+                "JMSProtocolManager",
+                "UIInspector"
             ],
             path: "Sources/JMSProtocolHandler",
             exclude: [
@@ -83,8 +89,15 @@ let package = Package(
         // JMS协议管理模块 - 协议检测和注册功能
         .target(
             name: "JMSProtocolManager",
-            dependencies: ["JMSCore"],
+            dependencies: ["JMSCore", "UIInspector"],
             path: "Sources/JMSProtocolManager"
+        ),
+        
+        // UI检查器模块 - 通用GUI界面调试工具
+        .target(
+            name: "UIInspector",
+            dependencies: ["JMSCore"],
+            path: "Sources/UIInspector"
         ),
         
         // 测试目标

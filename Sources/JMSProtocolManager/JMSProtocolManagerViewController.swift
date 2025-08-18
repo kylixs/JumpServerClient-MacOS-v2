@@ -1,6 +1,7 @@
 import Cocoa
 import Foundation
 import JMSCore
+import UIInspector
 
 /// JMS协议管理视图控制器
 public class JMSProtocolManagerViewController: NSViewController {
@@ -29,6 +30,14 @@ public class JMSProtocolManagerViewController: NSViewController {
     public override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        
+        // 生成初始UI分析报告
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            
+            self.generateUIAnalysisReport(phase: "初始加载")
+        }
+        
         checkProtocolStatus()
     }
     
@@ -46,23 +55,25 @@ public class JMSProtocolManagerViewController: NSViewController {
     }
     
     private func setupStatusSection() {
-        // 状态标题 - 向上移动
+        // 状态标题 - 从顶部开始布局
         let statusTitleLabel = NSTextField(labelWithString: "📡 协议状态")
         statusTitleLabel.font = NSFont.systemFont(ofSize: 14, weight: .medium)
-        statusTitleLabel.frame = NSRect(x: 20, y: 190, width: 200, height: 20)
+        statusTitleLabel.frame = NSRect(x: 20, y: 180, width: 200, height: 20)
         view.addSubview(statusTitleLabel)
         
-        // 状态信息 - 向上移动
+        // 状态信息 - 紧跟标题下方
         statusLabel = NSTextField(labelWithString: "正在检查协议状态...")
         statusLabel.font = NSFont.systemFont(ofSize: 12)
         statusLabel.textColor = NSColor.secondaryLabelColor
-        statusLabel.frame = NSRect(x: 20, y: 170, width: 460, height: 16)
+        statusLabel.frame = NSRect(x: 20, y: 160, width: 460, height: 16)
         view.addSubview(statusLabel)
+        
+        logger.info("✅ 状态区域设置完成 - 标题Y:\(statusTitleLabel.frame.origin.y), 状态Y:\(statusLabel.frame.origin.y)")
     }
     
     private func setupHandlersList() {
-        // 创建滚动视图 - 向上移动，增加高度
-        scrollView = NSScrollView(frame: NSRect(x: 20, y: 70, width: 460, height: 90))
+        // 创建滚动视图 - 紧跟状态信息下方
+        scrollView = NSScrollView(frame: NSRect(x: 20, y: 60, width: 460, height: 90))
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.borderType = .bezelBorder
@@ -81,7 +92,7 @@ public class JMSProtocolManagerViewController: NSViewController {
         scrollView.documentView = handlersListView
         view.addSubview(scrollView)
         
-        logger.info("✅ 处理器列表视图已设置")
+        logger.info("✅ 处理器列表视图已设置 - ScrollView Frame: \(scrollView.frame)")
     }
     
     private func setupActionButtons() {
@@ -180,6 +191,9 @@ public class JMSProtocolManagerViewController: NSViewController {
             self.logger.info("📊 状态更新: \(statusText)")
             
             self.logger.info("✅ 界面更新完成，堆栈视图子视图数量: \(self.handlersListView.arrangedSubviews.count)")
+            
+            // 生成更新后的UI分析报告
+            self.generateUIAnalysisReport(phase: "数据更新后")
         }
     }
     
@@ -347,4 +361,74 @@ public class JMSProtocolManagerViewController: NSViewController {
         checkStatusButton.isEnabled = enabled
         reregisterButton.isEnabled = enabled
     }
+    
+    // MARK: - UI分析报告
+    
+    /// 生成UI分析报告
+    /// - Parameter phase: 分析阶段描述
+    private func generateUIAnalysisReport(phase: String) {
+        let reportTitle = "JMS协议管理界面分析 - \(phase)"
+        let expectedLayout = """
+        期望布局结构:
+        1. 顶部状态区域 (y: 160-200) - 协议状态标题和信息
+        2. 中间列表区域 (y: 60-150) - 协议处理器列表
+        3. 底部按钮区域 (y: 20-50) - 操作按钮
+        
+        窗口尺寸: 520x220
+        主要组件: NSTextField(状态), NSScrollView(列表), NSStackView(内容), NSButton(操作)
+        """
+        
+        let report = view.generateUIAnalysisReport(title: reportTitle, expectedLayout: expectedLayout)
+        
+        // 输出报告摘要到日志
+        logger.info("📊 UI分析报告生成完成:")
+        logger.info(report.summary)
+        
+        // 输出高优先级问题
+        let highPriorityIssues = report.highPriorityIssues
+        if !highPriorityIssues.isEmpty {
+            logger.warning("🔴 发现\(highPriorityIssues.count)个高优先级布局问题:")
+            for issue in highPriorityIssues {
+                logger.warning("  - [\(issue.type.rawValue)] \(issue.description)")
+                logger.warning("    建议: \(issue.suggestion)")
+            }
+        }
+        
+        // 输出高优先级建议
+        let highPrioritySuggestions = report.highPrioritySuggestions
+        if !highPrioritySuggestions.isEmpty {
+            logger.info("💡 高优先级改进建议:")
+            for suggestion in highPrioritySuggestions {
+                logger.info("  - [\(suggestion.category.rawValue)] \(suggestion.title)")
+                logger.info("    \(suggestion.description)")
+            }
+        }
+        
+        // 保存详细报告到文件
+        UIInspector.shared.saveReport(report, filename: "JMS_Protocol_Manager_\(phase)_Analysis.txt")
+        
+        // 如果是数据更新后的报告，进行对比分析
+        if phase == "数据更新后", let initialReport = self.initialReport {
+            let comparison = ReportComparison(beforeReport: initialReport, afterReport: report)
+            
+            if !comparison.improvements.isEmpty {
+                logger.info("📈 界面改进:")
+                for improvement in comparison.improvements {
+                    logger.info("  ✅ \(improvement)")
+                }
+            }
+            
+            if !comparison.regressions.isEmpty {
+                logger.warning("📉 界面退化:")
+                for regression in comparison.regressions {
+                    logger.warning("  ❌ \(regression)")
+                }
+            }
+        } else if phase == "初始加载" {
+            self.initialReport = report
+        }
+    }
+    
+    /// 存储初始报告用于对比
+    private var initialReport: UIAnalysisReport?
 }
