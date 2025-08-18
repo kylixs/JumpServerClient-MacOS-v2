@@ -477,6 +477,7 @@ public class JMSProtocolManagerViewController: NSViewController {
         
         Task {
             do {
+                logger.info("🔄 开始协议注册任务...")
                 let success = try await registrationService.reregisterProtocol { [weak self] message, progress in
                     DispatchQueue.main.async {
                         self?.statusLabel.stringValue = message
@@ -503,22 +504,28 @@ public class JMSProtocolManagerViewController: NSViewController {
                 }
             } catch {
                 logger.error("❌ 协议注册异常: \(error)")
+                logger.error("❌ 错误类型: \(type(of: error))")
+                
                 await MainActor.run {
                     self.progressIndicator.isHidden = true
                     self.setUIEnabled(true)
                     
                     // 根据错误类型提供不同的处理
                     if let registrationError = error as? ProtocolRegistrationError {
+                        self.logger.info("🔍 检测到协议注册错误: \(registrationError)")
                         switch registrationError {
                         case .permissionDenied:
+                            self.logger.info("🔒 权限不足，显示权限提升对话框")
                             self.showPermissionDeniedAlert()
                         case .userCancelled:
                             self.statusLabel.stringValue = "用户取消了权限授权"
                             self.logger.info("ℹ️ 用户取消了权限授权")
                         default:
-                            self.statusLabel.stringValue = "协议注册失败: \(error.localizedDescription)"
+                            self.statusLabel.stringValue = "协议注册失败: \(registrationError.localizedDescription)"
+                            self.logger.error("❌ 其他注册错误: \(registrationError)")
                         }
                     } else {
+                        self.logger.error("❌ 未知错误类型: \(error)")
                         self.statusLabel.stringValue = "协议注册失败: \(error.localizedDescription)"
                     }
                     

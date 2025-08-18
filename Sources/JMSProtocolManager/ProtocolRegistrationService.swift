@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import JMSCore
 
 /// 协议注册服务错误类型
 public enum ProtocolRegistrationError: Error, LocalizedError {
@@ -100,20 +101,41 @@ public class ProtocolRegistrationService: @unchecked Sendable {
     /// 清理现有的协议注册
     /// - Throws: ProtocolRegistrationError
     private func cleanupExistingRegistrations() throws {
+        LogManager.shared.info("🧹 开始清理现有的协议注册...")
+        
         do {
             // 首先尝试普通权限清理
+            LogManager.shared.info("🔍 尝试使用普通权限清理...")
             try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
                           arguments: ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"])
-        } catch ProtocolRegistrationError.permissionDenied {
-            // 如果权限不足，尝试使用管理员权限
-            print("⚠️ 普通权限清理失败，尝试使用管理员权限...")
-            try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
-                          arguments: ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"],
-                          requiresElevation: true)
+            LogManager.shared.info("✅ 普通权限清理成功")
+        } catch let error as ProtocolRegistrationError {
+            LogManager.shared.error("❌ 普通权限清理失败: \(error)")
+            
+            if case .permissionDenied = error {
+                // 如果权限不足，尝试使用管理员权限
+                LogManager.shared.info("🔐 权限不足，尝试使用管理员权限...")
+                do {
+                    try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
+                                  arguments: ["-kill", "-r", "-domain", "local", "-domain", "system", "-domain", "user"],
+                                  requiresElevation: true)
+                    LogManager.shared.info("✅ 管理员权限清理成功")
+                } catch {
+                    LogManager.shared.error("❌ 管理员权限清理也失败: \(error)")
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        } catch {
+            LogManager.shared.error("❌ 清理过程中发生未知错误: \(error)")
+            throw ProtocolRegistrationError.systemError("清理失败: \(error.localizedDescription)")
         }
         
         // 清理Launch Services数据库中的jms协议条目
+        LogManager.shared.info("🗄️ 清理Launch Services数据库...")
         try cleanupLaunchServicesDatabase()
+        LogManager.shared.info("✅ 协议注册清理完成")
     }
     
     /// 清理Launch Services数据库
@@ -167,31 +189,55 @@ public class ProtocolRegistrationService: @unchecked Sendable {
     /// 使用系统API注册
     /// - Throws: ProtocolRegistrationError
     private func registerUsingSystemAPI() throws {
+        LogManager.shared.info("📝 开始使用系统API注册协议...")
+        
         do {
             // 首先尝试普通权限注册
+            LogManager.shared.info("🔍 尝试使用普通权限注册...")
             try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
                           arguments: ["-f", currentAppPath])
-        } catch ProtocolRegistrationError.permissionDenied {
-            // 如果权限不足，尝试使用管理员权限
-            print("⚠️ 普通权限注册失败，尝试使用管理员权限...")
-            try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
-                          arguments: ["-f", currentAppPath],
-                          requiresElevation: true)
+            LogManager.shared.info("✅ 普通权限注册成功")
+        } catch let error as ProtocolRegistrationError {
+            LogManager.shared.error("❌ 普通权限注册失败: \(error)")
+            
+            if case .permissionDenied = error {
+                // 如果权限不足，尝试使用管理员权限
+                LogManager.shared.info("🔐 权限不足，尝试使用管理员权限...")
+                do {
+                    try runCommand("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", 
+                                  arguments: ["-f", currentAppPath],
+                                  requiresElevation: true)
+                    LogManager.shared.info("✅ 管理员权限注册成功")
+                } catch {
+                    LogManager.shared.error("❌ 管理员权限注册也失败: \(error)")
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        } catch {
+            LogManager.shared.error("❌ 注册过程中发生未知错误: \(error)")
+            throw ProtocolRegistrationError.systemError("注册失败: \(error.localizedDescription)")
         }
         
         // 设置为默认处理器 - 兼容不同macOS版本
+        LogManager.shared.info("🎯 设置为默认协议处理器...")
         if #available(macOS 12.0, *) {
             let workspace = NSWorkspace.shared
             workspace.setDefaultApplication(at: URL(fileURLWithPath: currentAppPath), 
                                           toOpenURLsWithScheme: "jms") { error in
                 if let error = error {
-                    print("⚠️ 设置默认处理器警告: \(error.localizedDescription)")
+                    LogManager.shared.warning("⚠️ 设置默认处理器警告: \(error.localizedDescription)")
+                } else {
+                    LogManager.shared.info("✅ 默认处理器设置成功")
                 }
             }
         } else {
             // 对于较旧的macOS版本，使用lsregister应该足够
-            print("ℹ️ 在macOS 12.0以下版本，依赖lsregister进行协议注册")
+            LogManager.shared.info("ℹ️ 在macOS 12.0以下版本，依赖lsregister进行协议注册")
         }
+        
+        LogManager.shared.info("✅ 系统API注册完成")
     }
     
     /// 验证注册结果
@@ -226,6 +272,8 @@ public class ProtocolRegistrationService: @unchecked Sendable {
     
     /// 正常运行命令
     private func runCommandNormally(_ command: String, arguments: [String]) throws {
+        LogManager.shared.info("🚀 执行命令: \(command) \(arguments.joined(separator: " "))")
+        
         let task = Process()
         task.launchPath = command
         task.arguments = arguments
@@ -239,57 +287,120 @@ public class ProtocolRegistrationService: @unchecked Sendable {
             try task.run()
             task.waitUntilExit()
             
-            if task.terminationStatus != 0 {
-                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                let errorMessage = String(data: errorData, encoding: .utf8) ?? "未知错误"
+            let exitCode = task.terminationStatus
+            LogManager.shared.info("📊 命令退出码: \(exitCode)")
+            
+            // 读取输出和错误信息
+            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            
+            let output = String(data: outputData, encoding: .utf8) ?? ""
+            let errorMessage = String(data: errorData, encoding: .utf8) ?? ""
+            
+            if !output.isEmpty {
+                LogManager.shared.info("📤 命令输出: \(output)")
+            }
+            
+            if !errorMessage.isEmpty {
+                LogManager.shared.warning("📥 命令错误: \(errorMessage)")
+            }
+            
+            if exitCode != 0 {
+                // 检查各种权限相关的错误信息
+                let lowercaseError = errorMessage.lowercased()
+                let isPermissionError = lowercaseError.contains("permission") || 
+                                      lowercaseError.contains("denied") ||
+                                      lowercaseError.contains("not permitted") ||
+                                      lowercaseError.contains("operation not permitted") ||
+                                      lowercaseError.contains("unauthorized") ||
+                                      lowercaseError.contains("access denied") ||
+                                      exitCode == 1  // lsregister通常返回1表示权限问题
                 
-                if errorMessage.contains("permission") || errorMessage.contains("Permission") || 
-                   errorMessage.contains("Operation not permitted") {
+                if isPermissionError {
+                    LogManager.shared.warning("🔒 检测到权限错误，退出码: \(exitCode)")
                     throw ProtocolRegistrationError.permissionDenied
                 } else {
-                    throw ProtocolRegistrationError.systemError("命令执行失败: \(errorMessage)")
+                    LogManager.shared.error("❌ 命令执行失败，退出码: \(exitCode)")
+                    throw ProtocolRegistrationError.systemError("命令执行失败 (退出码: \(exitCode)): \(errorMessage)")
                 }
             }
             
-            // 记录成功输出
-            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: outputData, encoding: .utf8), !output.isEmpty {
-                print("✅ 命令执行成功: \(output)")
-            }
+            LogManager.shared.info("✅ 命令执行成功")
             
         } catch let error as ProtocolRegistrationError {
             throw error
         } catch {
+            LogManager.shared.error("❌ 命令执行异常: \(error)")
             throw ProtocolRegistrationError.systemError("命令执行异常: \(error.localizedDescription)")
         }
     }
     
     /// 使用管理员权限运行命令（macOS风格）
     private func runCommandWithElevation(_ command: String, arguments: [String]) throws {
+        LogManager.shared.info("🔐 使用AppleScript请求管理员权限...")
+        LogManager.shared.info("🚀 提升权限执行命令: \(command) \(arguments.joined(separator: " "))")
+        
+        // 转义命令和参数以防止注入攻击
+        let escapedCommand = command.replacingOccurrences(of: "\"", with: "\\\"")
+        let escapedArgs = arguments.map { $0.replacingOccurrences(of: "\"", with: "\\\"") }
+        let fullCommand = "\(escapedCommand) \(escapedArgs.joined(separator: " "))"
+        
         // 创建AppleScript来请求管理员权限
         let script = """
-        do shell script "\(command) \(arguments.joined(separator: " "))" with administrator privileges
+        try
+            do shell script "\(fullCommand)" with administrator privileges
+        on error errMsg number errNum
+            return "ERROR:" & errNum & ":" & errMsg
+        end try
         """
+        
+        LogManager.shared.debug("📜 AppleScript内容: \(script)")
         
         let appleScript = NSAppleScript(source: script)
         var errorDict: NSDictionary?
         
+        LogManager.shared.info("⏳ 执行AppleScript...")
         let result = appleScript?.executeAndReturnError(&errorDict)
         
         if let error = errorDict {
+            let errorCode = error["NSAppleScriptErrorNumber"] as? Int ?? -1
             let errorMessage = error["NSAppleScriptErrorMessage"] as? String ?? "未知错误"
-            if errorMessage.contains("User canceled") || errorMessage.contains("用户取消") {
+            
+            LogManager.shared.error("❌ AppleScript执行失败:")
+            LogManager.shared.error("   错误码: \(errorCode)")
+            LogManager.shared.error("   错误信息: \(errorMessage)")
+            
+            // 检查用户是否取消了权限请求
+            if errorCode == -128 || errorMessage.contains("User canceled") || 
+               errorMessage.contains("用户取消") || errorMessage.contains("cancelled") {
+                LogManager.shared.info("🚫 用户取消了权限授权")
                 throw ProtocolRegistrationError.userCancelled
             } else {
-                throw ProtocolRegistrationError.systemError("权限提升失败: \(errorMessage)")
+                LogManager.shared.error("💥 权限提升失败")
+                throw ProtocolRegistrationError.systemError("权限提升失败 (错误码: \(errorCode)): \(errorMessage)")
             }
         }
         
-        if result == nil {
-            throw ProtocolRegistrationError.systemError("命令执行失败")
+        if let result = result {
+            let resultString = result.stringValue ?? ""
+            LogManager.shared.info("📤 AppleScript结果: \(resultString)")
+            
+            // 检查结果中是否包含错误信息
+            if resultString.hasPrefix("ERROR:") {
+                let components = resultString.components(separatedBy: ":")
+                if components.count >= 3 {
+                    let errorCode = components[1]
+                    let errorMessage = components[2]
+                    LogManager.shared.error("❌ 命令执行失败 (错误码: \(errorCode)): \(errorMessage)")
+                    throw ProtocolRegistrationError.systemError("命令执行失败: \(errorMessage)")
+                }
+            }
+            
+            LogManager.shared.info("✅ 管理员权限命令执行成功")
+        } else {
+            LogManager.shared.error("❌ AppleScript返回空结果")
+            throw ProtocolRegistrationError.systemError("AppleScript执行失败：返回空结果")
         }
-        
-        print("✅ 管理员权限命令执行成功")
     }
     
     /// 检查注册脚本是否存在
